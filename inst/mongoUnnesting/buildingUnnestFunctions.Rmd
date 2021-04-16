@@ -1,0 +1,391 @@
+---
+title: "Explanation and Use of MongoDB Unnesting Functions"
+author: "Neil Kester"
+date: "4/14/2021"
+output: 
+  html_document:
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE)
+```
+
+# Purpose  
+
+These functions were built to help un-nest data produced from a MongoDB query. They are general enough to be used to only query the database and return the result or query the database and then un-nest one level of columns in the results. It can also be used without the query function to simply un-nest a nested dataframe in a rowwise fashion. 
+
+Because MongoDB is optimized for data ingest and works with JSON objects, this function employs techniques described by Hendrik van Broekhuizen in his "Nested data: JSON to tibble" GitLab page referenced in the "References" section.  
+
+Of note, the processes described in Hendrik's post did not perform as expected because sample query results started at 2,251 records and expanded to ~4.9M. The expected results was a tidy data frame of the same length (an observation) with more columns. Using the newer `unnest_wider` functions didn't work either. For this reason, I took the concepts Hendrik outlined and wrote my own functions to accomplish the intended effect.
+
+# References  
+
+  * [Nested data: JSON to tibble](https://hendrikvanb.gitlab.io/2018/07/nested_data-json_to_tibble/) by Hendrik van Broekhuizen  
+  
+# The Functions
+
+## High Level Function  
+
+This integrates mid and low functions together.  
+
+```{r high_queryAndOrTransformNestedMongoDb, eval=FALSE, class.source = 'fold-hide'}
+#' Query and/or Transform MongoDB
+#'
+#' This function accepts up to five parameters to describe the connection, query, 
+#'  and fields to return. In the process, it conducts specific unnesting functions 
+#'  required for the collection in question. As such, it is not appropriate for 
+#'  general use.
+#'
+#' @param mongoUri This is a double quoted character string of the connection 
+#'  object required for the simulation's MongoDB.  
+#' @param mongoDb This is a double quoted character string of the database name 
+#'  containing the required files.
+#' @param mongoCollection This is a double quoted character string of the mongo
+#'  collection within the named database containing the required information.
+#' @param mongoQuery This is a double quoted character string containing the json
+#'  query to pass to the MongoDB. Note that users should escape nested double
+#'  quotes with the \ escape character.  
+#' @param mongoFields This is a double quoted json object of collection fields
+#'  that should be returned (annoted with `true`) and those that should not be
+#'  returned (annoted with `false`). 
+#' @param mongoData This is a data frame passed to this function to unnest 
+#'  specific columns. If this is used, do not provide the `mongoUri`, `mongoDb`,
+#'  `mongoCollection`, `mongoQuery`, or `mongoFields` pramaters.
+#' @param unnestCols This is a character vector of the columns you need to unnest.
+#'
+#' @return This function returns an unnested tibble in which each row is an
+#'  observation of a line of sight event.  
+#' 
+#' @importFrom magrittr %>%
+#' @importFrom mongolite mongo
+#' @importFrom tibble as_tibble
+#' @importFrom tidyr unnest
+#' @importFrom dplyr select
+high_queryAndOrTransformNestedMongoDb <- function(mongoUri = "",
+                                                  mongoDb = "",
+                                                  mongoCollection = "",
+                                                  mongoQuery = "{}",
+                                                  mongoFields = "{}",
+                                                  mongoData = "",
+                                                  unnestCols = ""){
+  
+  require(package = "magrittr",
+          quietly = TRUE) 
+  
+  { # Input checks ----
+    
+    { # Check if Query information is provided ----
+      
+      if(all(nchar(mongoUri)!=0,
+             nchar(mongoDb)!=0,
+             nchar(mongoCollection)!=0)){
+        
+        uriInput <- TRUE
+        
+      }else{
+        
+        uriInput <- FALSE
+        
+      }
+      
+    } # close Check if Query information is provided section  
+    
+    { # Check if nested data is provided ----
+      
+      if(any(nchar(mongoData)!=0)){
+        
+        nestedData <- TRUE
+        
+      }else{
+        
+        nestedData <- FALSE
+        
+      }
+      
+    } # close Check if nested data is provided section
+    
+    { # Check if any unnesting needs to happen ----
+      
+      if(any(nchar(unnestCols)!=0)){
+        
+        unnest <- TRUE
+        
+      }else{
+        
+        unnest <- FALSE
+        
+      }
+      
+    } # close Check if any unnesting needs to happen section
+    
+    { # One valid input object provided ----
+      
+      if(all(!uriInput,
+             !nestedData)){
+        
+        stop("Either a connection object or an existing tibble must be provided!")
+        
+      }
+      
+    } # close One valid input object provided section
+    
+    { # Only one valid input object provided ----
+      
+      #> This function can't deal with both a mongo data set and a mongo query at
+      #>  the same time.
+      
+      if(all(uriInput,
+             nestedData)){
+        
+        stop("Either provide the elements of a mongoDB connection object OR an 
+             existing nested dataframe to unnest. Not both")
+        
+      }
+      
+      
+    } # close Only one valid input object provided section
+    
+  } # close Input checks section
+  
+  #> Only Queyr the MongoDB if the connection objects have been provided
+  
+  if(uriInput){
+    
+    mongoConnection <- mongolite::mongo(url = mongoUri,
+                                        db = mongoDb,
+                                        collection = mongoCollection)
+    
+    mongoData <- mongoConnection$find(query = mongoQuery,
+                                      fields = mongoFields)
+    
+    mongoConnection$disconnect()
+    
+  }
+  
+  if(unnest){
+    
+    mongoData <- mid_multiColRowwiseUnnest(data = mongoData,
+                                           unnestCols = unnestCols)
+    
+  }
+  
+  if(!exists("mongoData")){
+    
+    mongoData <- NULL
+    
+    warning("Either the query didn't produce a response or no input data was provided!")
+    
+  }
+  
+  return(mongoData)
+  
+}
+```
+
+## Mid Level Function
+  
+This integrates low functions together.  
+  
+```{r mid_multiColRowwiseUnnest, eval=FALSE, class.source = 'fold-hide'}
+#' Multi Column Row-wise Unnest
+#'
+#' Execute the low function `los_low_mapAndUnnest` over many rows and applied
+#'  to multiple columns iteratively. Columns are unnested in the order entered
+#'  in the `cols` character vector.
+#'
+#' @param queryResults The results from a mongolite query. It should be a multi-level
+#'  data frame. 
+#' @param unnestCols A character vector of column names to apply the `los_low_mapAndUnnest`
+#'  function to.
+#'
+#' @return This returns a tibble.
+#'
+#' @importFrom dplyr bind_rows
+mid_multiColRowwiseUnnest <- function(data,
+                                      unnestCols){
+  
+  unnestedResults <-  NULL
+
+  for(oneCol in unnestCols){
+    
+    message(paste0("Working on column: ",
+                   oneCol))
+    
+    for(idx in 1:nrow(data)){
+      
+      unnestedResults <- dplyr::bind_rows(unnestedResults,
+                                          low_mapAndUnnest(data = data[idx,],
+                                                           unnestCols = oneCol))
+      
+    } # close idx loop
+    
+  } # close cols loop
+  
+  return(unnestedResults)
+  
+} # close mid_multiColRowwiseUnnest
+```
+
+## Low Level Function
+
+This is the basic worker.
+
+```{r low_mapAndUnnest, eval=FALSE, class.source = 'fold-hide'}
+#' Row-wise Map and Unnest JSON by column
+#'
+#' This function is intended to be used in a row-wise application to map and
+#'  unnest multilevel columns resulting from nested JSON objects. 
+#'
+#' @importFrom magrittr %>%
+#' @importFrom purrr map_if
+#' @importFrom tibble tibble
+#' @importFrom tidyr unnest
+low_mapAndUnnest <- function(data,
+                             unnestCols){
+  
+  if(any(!(unnestCols %in% names(data)))){
+    
+    stop("The cols argument must exist as a column name in the data argument.")
+    
+  }
+  
+  stepData <- data %>%
+    purrr::map_if(.x = .,
+                  .p = is.data.frame,
+                  .f = list) %>%
+    tibble::as_tibble(.) %>%
+    tidyr::unnest(cols = dplyr::all_of(unnestCols))
+  
+  return(stepData)
+  
+} # close los_low_mapAndUnnest
+```
+
+# Putting Them To Use  
+
+These functions have been moved to their own files so they are easier to manage. Here we will load them, load the connection information and queries used in the function's implementation.
+
+## Load the Functions  
+
+```{r}
+
+# low functions
+
+source("low_mapAndUnnest.R")
+
+# mid functions
+
+source("mid_multiColRowwiseUnnest.R")
+
+# high functions
+
+source("high_queryAndOrTransformNestedMongoDb.R")
+
+```  
+
+## Load the Connection Information And Queries  
+
+This file defines the following variables:  
+  
+  * `mongoUri`  
+  * `mongoDb`  
+  * `losMongoCollection`  
+  * `losMongoQuery`  
+  * `losMongoFields`  
+  * `C2MongoCollection`  
+  * `C2MongoQuery`  
+  * `C2MongoFields`
+
+```{r}
+
+source("ConnectionObj.R")
+
+```  
+
+
+## Sensor LOS Results  
+
+Query and un-nest the LOS results. We'll see that we need to unnest the `event` column.
+
+```{r,message=FALSE}
+
+losMongoData <- high_queryAndOrTransformNestedMongoDb(mongoUri = mongoUri,
+                                                   mongoDb = mongoDb,
+                                                   mongoCollection = losMongoCollection,
+                                                   mongoQuery = losMongoQuery,
+                                                   mongoFields = losMongoFields)
+
+
+dplyr::glimpse(losMongoData)
+
+```
+
+
+```{r}
+
+unnestedLosMongoData <- high_queryAndOrTransformNestedMongoDb(mongoData = losMongoData,
+                                                              unnestCols = "event")
+
+dplyr::glimpse(unnestedLosMongoData)
+
+```  
+
+The `event` column was the only nested column in this query so we are good. We can do both actions in one function call with:  
+
+```{r}
+
+LosData <- high_queryAndOrTransformNestedMongoDb(mongoUri = mongoUri,
+                                      mongoDb = mongoDb,
+                                      mongoCollection = losMongoCollection,
+                                      mongoQuery = losMongoQuery,
+                                      mongoFields = losMongoFields,
+                                      unnestCols = "event")
+
+dplyr::glimpse(LosData)
+
+```
+
+## Sensor Detection Results (C2)
+
+Query and un-nest the C2 Simulation Message collection. By looking at the data structure in MongoDB Compass we know we need to un-nest the following columns one at a time: `event`, `messageData`, `any`, `sensorDetection`.  We will loop through this to make it faster.  
+
+```{r}
+
+unnestCols <- c("event","messageData", "any", "sensorDetection")
+
+C2MongoData <- high_queryAndOrTransformNestedMongoDb(mongoUri = mongoUri,
+                                                      mongoDb = mongoDb,
+                                                      mongoCollection = C2MongoCollection,
+                                                      mongoQuery = C2MongoQuery,
+                                                      mongoFields = C2MongoFields)
+
+for(unnestCol in unnestCols){
+  
+  C2MongoData <- high_queryAndOrTransformNestedMongoDb(mongoData = C2MongoData, 
+                                                        unnestCols = unnestCol)
+  
+}
+
+dplyr::glimpse(C2MongoData)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

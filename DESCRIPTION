@@ -1,11 +1,12 @@
 Package: modSim
 Type: Package
-Title: What the Package Does (Title Case)
-Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Title: This package contains functions used to support my JHU Thesis work.
+Version: 0.1.1
+Author: Neil Kester
+Maintainer: Neil Kester <nkester1@jh.edu>
+Description: These functions do everything from simple queries and unnesting of a
+  MongoDB instance to the comparisons of various design points found in the db.
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
+RoxygenNote: 7.1.1

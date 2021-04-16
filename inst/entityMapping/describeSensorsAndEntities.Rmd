@@ -1,0 +1,94 @@
+---
+title: "Describe Sensors and Entities"
+author: "Neil Kester"
+date: "4/15/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE)
+```
+
+# Purpose  
+
+This function's purpose is to provide the user with four tibbles as a named list. The first tibble, named `SensorDescription`, lists all sensors present in the query, their sensor type, and set magnification. The second tibble, named `EntityIdToName` maps each machine readable entity ID to its corresponding human readable name. The third tibble, named `SensorToEntityId`, maps each sensor ID to the entity it is mounted to. This means each entity may be shown multiple times while each sensor only shows up once.  
+
+The function uses the `modSim::mongoUnnest` function to query and un-nest the returned data until it is in a useable form. 
+
+# mapSensorsAndEntities Function   
+
+
+```{r}
+#' Map Sensors and Entities
+#'
+#' This function accepts the same inputs as the `modSim::mongoUnnest` function
+#'  minus the `unnestCols` parameter. It executes the requested query which is
+#'  expected to be from the `AcquireModel.state.sensors` collection.  
+#'
+#' @param mongoUri This is a double quoted character string of the connection 
+#'  object required for the simulation's MongoDB.  
+#' @param mongoDb This is a double quoted character string of the database name 
+#'  containing the required files.
+#' @param mongoCollection This is a double quoted character string of the mongo
+#'  collection within the named database containing the required information.
+#' @param mongoQuery This is a double quoted character string containing the json
+#'  query to pass to the MongoDB. Note that users should escape nested double
+#'  quotes with the \ escape character.  
+#' @param mongoFields This is a double quoted json object of collection fields
+#'  that should be returned (annoted with `true`) and those that should not be
+#'  returned (annoted with `false`). 
+#'
+#' @return This function returns a four element named list of tibbles that 
+#'  describe all sensors and entities, their IDs and description.  
+#'
+#' @importFrom modSim mongoUnnest
+#' @importFrom dplyr distinct
+#' 
+#' @export mapSensorsAndEntities
+mapSensorsAndEntities <- function(mongoUri,
+                                  mongoDb,
+                                  mongoCollection,
+                                  mongoFields,
+                                  mongoQuery){
+
+    sensorState <- modSim::mongoUnnest(mongoUri = mongoUri,
+                                                        mongoDb = mongoDb,
+                                                        mongoCollection = mongoCollection,
+                                                        mongoFields = mongoFields,
+                                                        mongoQuery = mongoQuery,
+                                                        unnestCols = "state")
+    
+    sensorState <- modSim::mongoUnnest(mongoData = sensorState,
+                                                     unnestCols = "status")
+    
+    sensorDescription <- dplyr::distinct(.data = sensorState,
+                                         sensorId,
+                                         acquireSensorType,
+                                         magnification)
+    
+    entityIdToName <- dplyr::distinct(.data = sensorState,
+                                      entityId,
+                                      source)
+    
+    sensorToEntity <- dplyr::distinct(.data = sensorState,
+                                      sensorId,
+                                      entityId)
+  
+    return(list("SensorDescription" = sensorDescription,
+                "EntityIdToName" = entityIdToName,
+                "SensorToEntityId" = sensorToEntity,
+                "UnnestedSensorState" = sensorState))
+    
+} # close mapSensorsAndEntities function
+
+```  
+
+
+```{r}
+mapSensorsAndEntities(mongoUri = mongoUri,
+                      mongoDb = mongoDb,
+                      mongoCollection = sensorIDNameCollection,
+                      mongoFields = sensorIDNameFields,
+                      mongoQuery = sensorIDNameQuery)
+
+```
