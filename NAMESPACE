@@ -2,6 +2,7 @@
 
 export(mapSensorsAndEntities)
 export(mongoUnnest)
+export(sensorAcquisition)
 importFrom(dplyr,bind_rows)
 importFrom(dplyr,distinct)
 importFrom(dplyr,select)
