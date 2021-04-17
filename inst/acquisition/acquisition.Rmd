@@ -46,10 +46,10 @@ sensorAcquisition<-function(mongoUri,
                             recursiveUnnests){
   
   sensorAcqData <- mongoUnnest(mongoUri = mongoUri,
-                             mongoDb = mongoDb,
-                             mongoCollection = mongoCollection,
-                             mongoQuery = mongoCollection,
-                             mongoFields = mongoCollection)
+                               mongoDb = mongoDb,
+                               mongoCollection = mongoCollection,
+                               mongoQuery = mongoQuery,
+                               mongoFields = mongoFields)
   
   for(recursiveUnnest in recursiveUnnests){
     
