@@ -72,7 +72,7 @@ mid_multiColRowwiseUnnest <- function(data,
 
       unnestedResults <- dplyr::bind_rows(unnestedResults,
                                           low_mapAndUnnest(data = data[idx,],
-                                                           unnestCols = oneCol))
+                                                           unnestCol = oneCol))
 
     } # close idx loop
 
