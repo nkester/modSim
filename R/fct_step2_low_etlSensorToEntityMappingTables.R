@@ -8,7 +8,7 @@
 #' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
 #' @param mongoConnParam This is a two element named list including the "mongoUri"
-#'   which includes the username and password and a single character string and
+#'   which includes the user name and password and a single character string and
 #'   the "mongoDb" name as a character string.
 #' @param pgConnParam A five element named list containing the following elements:
 #'  "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".
@@ -19,7 +19,6 @@
 #'
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
-#' @export etlSensorToEntityMappingTables
 #'
 #' @importFrom dplyr distinct mutate case_when rename
 #' @importFrom stringr str_replace_all str_detect str_extract
