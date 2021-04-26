@@ -4,6 +4,8 @@
 #'  minus the `unnestCols` parameter. It executes the requested query which is
 #'  expected to be from the `AcquireModel.state.sensors` collection.
 #'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
 #' @param mongoUri This is a double quoted character string of the connection
 #'  object required for the simulation's MongoDB.
 #' @param mongoDb This is a double quoted character string of the database name

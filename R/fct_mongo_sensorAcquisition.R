@@ -4,6 +4,8 @@
 #'  collection. This is unique because all of the nests are recursive meaning
 #'  they must be performed as a loop.
 #'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
 #' @param mongoUri This is a double quoted character string of the connection
 #'  object required for the simulation's MongoDB.
 #' @param mongoDb This is a double quoted character string of the database name
