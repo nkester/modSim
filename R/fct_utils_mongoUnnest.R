@@ -2,19 +2,26 @@
 # low_mapAndUnnest --------------------------------------------------------
 
 
-#' Row-wise Map and Unnest JSON by column
+#' Row-wise Map and Un-nest JSON by column
 #'
 #' This function is intended to be used in a row-wise application to map and
-#'  unnest multilevel columns resulting from nested JSON objects.
+#'  un-nest multilevel columns resulting from nested JSON objects.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param data This is a nested row, provided by the `mid_multiColRowwiseUnnest`
+#'   function.
+#'
+#' @param unnestCol This should be the single column that must be un-nested.
 #'
 #' @importFrom magrittr %>%
 #' @importFrom purrr map_if
 #' @importFrom tibble tibble
 #' @importFrom tidyr unnest
 low_mapAndUnnest <- function(data,
-                             unnestCols){
+                             unnestCol){
 
-  if(any(!(unnestCols %in% names(data)))){
+  if(any(!(unnestCol %in% names(data)))){
 
     stop("The cols argument must exist as a column name in the data argument.")
 
@@ -25,7 +32,7 @@ low_mapAndUnnest <- function(data,
                   .p = is.data.frame,
                   .f = list) %>%
     tibble::as_tibble(.) %>%
-    tidyr::unnest(cols = dplyr::all_of(unnestCols))
+    tidyr::unnest(cols = dplyr::all_of(unnestCol))
 
   return(stepData)
 
@@ -40,6 +47,8 @@ low_mapAndUnnest <- function(data,
 #' Execute the low function `los_low_mapAndUnnest` over many rows and applied
 #'  to multiple columns iteratively. Columns are unnested in the order entered
 #'  in the `cols` character vector.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
 #' @param queryResults The results from a mongolite query. It should be a multi-level
 #'  data frame.
@@ -83,6 +92,8 @@ mid_multiColRowwiseUnnest <- function(data,
 #'  and fields to return. In the process, it conducts specific unnesting functions
 #'  required for the collection in question. As such, it is not appropriate for
 #'  general use.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
 #' @param mongoUri This is a double quoted character string of the connection
 #'  object required for the simulation's MongoDB.
