@@ -1,0 +1,58 @@
+#Function to take csv data and create a SQL query to send to the database. The output query is useable for both SQLite and PostgreSQL DBMSs
+fillTableQuery <- function(data,tableName){
+
+  query<-sprintf("INSERT INTO %s VALUES",
+                 tableName)
+
+  for(rdx in 1:nrow(data)){
+
+    query <- paste(query,"(",sep = '')
+
+    row <- NULL
+
+    for(cdx in 1:ncol(data)){
+
+      if(cdx == ncol(data)){
+
+        if(is.na(data[rdx,cdx][[1]])){
+
+          row <- paste(row,"NULL",sep = '')
+
+        }else{
+
+          row <- paste(row,"'",data[rdx,cdx][[1]],"'",sep = '')
+
+        }
+
+      }else{
+
+        if(is.na(data[rdx,cdx][[1]])){
+
+          row <-paste(row,"NULL,",sep = '')
+
+        }else{
+
+          row <- paste(row,"'",data[rdx,cdx][[1]],"',",sep = '')
+
+        }
+      }
+
+    }#close cdx loop
+
+    query <- paste(query,row,sep = '')
+
+    if(rdx == nrow(data)){
+
+      query <- paste(query,")",sep = '')
+
+    }else{#if complete
+
+      query <- paste(query,"),",sep = '')
+
+    }#close else
+
+  }#close rdx loop
+
+  return(query)
+
+}#close fillTableQuery function

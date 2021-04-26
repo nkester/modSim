@@ -1,0 +1,464 @@
+---
+title: 'Step 2: Query MongoDB, transform data, and write to PostreSQL DB'
+author: "Neil Kester"
+date: "4/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      messages = FALSE)
+```
+
+# Purpose
+
+These functions execute the extract, transform, and load (ETL) steps taking the data required to support analysis from the simulation's MongoDB logs, structuring and relating it, and then loading it into a relational database (in this case PostgreSQL) in preparation for later analysis.  
+
+# Low Functions  
+
+## Sensor to Entity Mapping  
+
+Select information from the `AcquireModel.state.sensors` MongoDB collection and write it to the `sensorDescription`, `entityIdToName`, `sensorToEntityId`, and `unnestedSensorState` PostgreSQL tables.  
+
+These tables provide maps to the various entity and sensor Ids produced by the simulation.  
+
+```{r fct_low_etlSensorToEntityMappingTables}
+
+fct_low_etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoint){
+  
+  requireNamespace(package = "magrittr")
+  
+  { # Complete the MongoDB Connection Parameters ----
+    
+    mongoConnParam[["collection"]] <- "AcquireModel.state.sensors"
+    
+    mongoConnParam[["query"]] <- sprintf("{\"designPoint\": \"%s\"}",
+                                         designPoint)
+    
+    mongoConnParam[["fields"]] <- "{\"_id\": 1, \"runId\": 1, \"runTime\": 1, 
+  \"designPoint\": 1, \"iteration\": 1, \"time\": 1, \"state.sensorId\": 1, 
+  \"state.entityId\": 1, \"state.acquireSensorType\": 1, 
+  \"state.magnification\": 1, \"state.status.source\": 1}"
+    
+  } # close Complete the MongoDB Connection Parameters
+  
+  { # Extract ----
+    
+    { # Query MongoDb and unnest information about sensors and entities ----
+      
+      message("Extracting data from MongoDB")
+      
+      entitySensorMapping <- modSim::mapSensorsAndEntities(mongoUri = mongoConnParam[["mongoUri"]],
+                                                           mongoDb = mongoConnParam[["mongoDb"]],
+                                                           mongoCollection = mongoConnParam[["collection"]],
+                                                           mongoFields = mongoConnParam[["fields"]],
+                                                           mongoQuery = mongoConnParam[["query"]])
+      
+      metaData <- entitySensorMapping$UnnestedSensorState %>%
+        dplyr::distinct(.data = .,
+                        runId,
+                        designPoint,
+                        iteration)
+      
+    } # close Query MongoDb and unnest information about sensors and entities section
+    
+  } # close Extract section
+  
+  { # Transform and Load ----
+    
+    { # sensorDescription ----
+      
+      message("Transforming and loading sensorDescription data.")
+      
+      entitySensorMapping$SensorDescription <- entitySensorMapping$SensorDescription %>%
+        dplyr::mutate(.data = .,
+                      designPoint = dplyr::distinct(metaData,
+                                                    designPoint)[[1]],
+                      sensorId_pkId = NA)
+      
+      query_sensorDescription <- fillTableQuery(data = entitySensorMapping$SensorDescription,
+                                                tableName = paste0("\"sensorDescription\" (",
+                                                                   paste0("\"",
+                                                                          names(entitySensorMapping$SensorDescription),
+                                                                          "\"",
+                                                                          collapse = ","),
+                                                                   ")"))
+      
+      #> This is required because pg uses the unquoted `DEFAULT` for its auto-incrementing columns.
+      query_sensorDescription <- stringr::str_replace_all(string = query_sensorDescription,
+                                                          pattern = "NULL",
+                                                          replacement = "DEFAULT")
+      
+      sendPgFillTableQuery(query = query_sensorDescription,
+                           host = pgConnParam[["pgHost"]],
+                           port = pgConnParam[["pgPort"]],
+                           user = pgConnParam[["pgUser"]],
+                           password = pgConnParam[["pgPass"]],
+                           dbname = pgConnParam[["pgDb"]])
+      
+      rm(query_sensorDescription)
+      
+    } # close sensorDescription section
+    
+    { # entityIdToName ----
+      
+      message("Transforming and loading entityIdToName data.")
+      
+      entitySensorMapping$EntityIdToName <- entitySensorMapping$EntityIdToName %>%
+        dplyr::mutate(.data = .,
+                      designPoint = dplyr::distinct(metaData,
+                                                    designPoint)[[1]],
+                      force = dplyr::case_when(
+                        stringr::str_detect(string = source,
+                                            pattern = "^(?i)(blueforce)") ~ "BLUEFORCE",
+                        stringr::str_detect(string = source,
+                                            pattern = "^(?i)(redforce)") ~ "REDFORCE",
+                        TRUE ~ "OTHER"
+                      ),
+                      shortName = stringr::str_extract(string = source,
+                                                       pattern = "[^/]*$"),
+                      entityId_pkId = NA)
+      
+      query_entityIdToName <- fillTableQuery(data = entitySensorMapping$EntityIdToName,
+                                             tableName = paste0("\"entityIdToName\" (",
+                                                                paste0("\"",
+                                                                       names(entitySensorMapping$EntityIdToName),
+                                                                       "\"",
+                                                                       collapse = ","),
+                                                                ")"))
+      
+      #> This is required because pg uses the unquoted `DEFAULT` for its auto-incrementing columns.
+      query_entityIdToName <- stringr::str_replace_all(string = query_entityIdToName,
+                                                       pattern = "NULL",
+                                                       replacement = "DEFAULT")
+      
+      sendPgFillTableQuery(query = query_entityIdToName,
+                           host = pgConnParam[["pgHost"]],
+                           port = pgConnParam[["pgPort"]],
+                           user = pgConnParam[["pgUser"]],
+                           password = pgConnParam[["pgPass"]],
+                           dbname = pgConnParam[["pgDb"]])
+      
+      rm(query_entityIdToName)
+      
+    } # close entityIdToName section
+    
+    { # sensorToEntityId ---- 
+      
+      message("Transforming and loading sensorToEntityId data.")
+      
+      entitySensorMapping$SensorToEntityId <- entitySensorMapping$SensorToEntityId %>%
+        dplyr::mutate(.data = .,
+                      designPoint = dplyr::distinct(metaData,
+                                                    designPoint)[[1]],
+                      sensorToEntityId_pkId = NA)
+      
+      query_sensorToEntityId <- fillTableQuery(data = entitySensorMapping$SensorToEntityId,
+                                               tableName = paste0("\"sensorToEntityId\" (",
+                                                                  paste0("\"",
+                                                                         names(entitySensorMapping$SensorToEntityId),
+                                                                         "\"",
+                                                                         collapse = ","),
+                                                                  ")"))
+      
+      #> This is required because pg uses the unquoted `DEFAULT` for its auto-incrementing columns.
+      query_sensorToEntityId <- stringr::str_replace_all(string = query_sensorToEntityId,
+                                                         pattern = "NULL",
+                                                         replacement = "DEFAULT")
+      
+      sendPgFillTableQuery(query = query_sensorToEntityId,
+                           host = pgConnParam[["pgHost"]],
+                           port = pgConnParam[["pgPort"]],
+                           user = pgConnParam[["pgUser"]],
+                           password = pgConnParam[["pgPass"]],
+                           dbname = pgConnParam[["pgDb"]])
+      
+      rm(query_sensorToEntityId)
+      
+    } # close sensorToEntityId section
+    
+    { # unnestedSensorState ----
+      
+      message("Transforming and loading unnestedSensorState data.")
+      
+      #> This is the full set of un-nested data from the original query. While not truly "raw", this could be considered the original data set.
+      
+      entitySensorMapping$UnnestedSensorState <- entitySensorMapping$UnnestedSensorState %>%
+        dplyr::rename(.data = .,
+                      "id" = "_id",
+                      "time_ms" = "time")
+      
+      query_unnestedSensorState <- fillTableQuery(data = entitySensorMapping$UnnestedSensorState,
+                                                  tableName = paste0("\"unnestedSensorState\" (",
+                                                                     paste0("\"",
+                                                                            names(entitySensorMapping$UnnestedSensorState),
+                                                                            "\"",
+                                                                            collapse = ","),
+                                                                     ")"))
+      
+      sendPgFillTableQuery(query = query_unnestedSensorState,
+                           host = pgConnParam[["pgHost"]],
+                           port = pgConnParam[["pgPort"]],
+                           user = pgConnParam[["pgUser"]],
+                           password = pgConnParam[["pgPass"]],
+                           dbname = pgConnParam[["pgDb"]])
+      
+      rm(query_unnestedSensorState)
+      
+    } # close unnestedSensorState section
+    
+  } # close Transform and Load section
+  
+} # close fct_low_etlSensorToEntityMappingTables
+
+```
+
+```{r test_fct_low_etlSensorToEntityMappingTables,eval = FALSE}
+
+#> These source files read in the mongoURI and mongoDb elements and the PostgreSQL connection objects.
+
+source("./connectionObjects/pgConnectionObj.R")
+source("./connectionObjects/mongoConnectionObj.R")
+
+#> Add to the pgConnParam the database name 
+
+pgConnParam[["pgDb"]] <- "modSim3"
+
+fct_low_etlSensorToEntityMappingTables(mongoConnParam = mongoConnParam,
+                                       pgConnParam = pgConnParam,
+                                       designPoint = "NeilsTestScenario")
+
+```  
+
+
+## Line of Sight Tables  
+
+This table describes when a sensor target has Line of Sight (LOS). This does not mean they have acquired each other but rather that their line of sight is not obstructed. 
+
+```{r fct_low_etlLosData}
+
+fct_low_etlLosData <- function(mongoConnParam,pgConnParam,designPoint){
+  
+  requireNamespace(package = "magrittr")
+  
+  { # Complete the MongoDB Connection Parameters ----
+    
+    mongoConnParam[["collection"]] <- "AcquireModel.event.LOSTargetStatus"
+    
+    mongoConnParam[["query"]] <- sprintf("{\"designPoint\": \"%s\"}",
+                                         designPoint)
+    
+    mongoConnParam[["fields"]] <- "{\"_id\": true, \"runId\": true, \"runTime\": true, 
+  \"designPoint\": true, \"iteration\": true, \"time\": true,\"event\": true}"
+    
+  } # close Complete the MongoDB Connection Parameters
+  
+  { # Extract ----
+    
+    message("Extracting data from the MongoDB")
+    
+    losData <- modSim::mongoUnnest(mongoUri = mongoConnParam[["mongoUri"]],
+                                   mongoDb = mongoConnParam[["mongoDb"]],
+                                   mongoCollection = mongoConnParam[["collection"]],
+                                   mongoFields = mongoConnParam[["fields"]],
+                                   mongoQuery = mongoConnParam[["query"]],
+                                   unnestCols = "event")
+    
+  } # close Extract
+  
+  { # Transform and Load ----
+    
+    message("Transforming and loading losData")
+    
+    losData <- losData %>%
+      dplyr::rename("id" = "_id",
+                    "time_ms" = "time") %>%
+      dplyr::mutate(time_s = time_ms/1000,
+                    losState_pkId = NA)
+    
+    query_losData <- fillTableQuery(data = losData,
+                                    tableName = paste0("\"losState\" (",
+                                                       paste0("\"",
+                                                              names(losData),
+                                                              "\"",
+                                                              collapse = ","),
+                                                       ")"))
+    
+    #> This is required because pg uses the unquoted `DEFAULT` for its auto-incrementing columns.
+    query_losData <- stringr::str_replace_all(string = query_losData,
+                                              pattern = "NULL",
+                                              replacement = "DEFAULT")
+    
+    sendPgFillTableQuery(query = query_losData,
+                         host = pgConnParam[["pgHost"]],
+                         port = pgConnParam[["pgPort"]],
+                         user = pgConnParam[["pgUser"]],
+                         password = pgConnParam[["pgPass"]],
+                         dbname = pgConnParam[["pgDb"]])
+    
+  } # close Transform and Load
+  
+  rm(query_losData)
+  
+} # close fct_low_etlLosData
+
+```
+
+```{r test_fct_low_etlLosData,eval=FALSE}
+
+#> These source files read in the mongoURI and mongoDb elements and the PostgreSQL connection objects.
+
+source("./connectionObjects/pgConnectionObj.R")
+source("./connectionObjects/mongoConnectionObj.R")
+
+#> Add to the pgConnParam the database name 
+
+pgConnParam[["pgDb"]] <- "modSim3"
+
+fct_low_etlLosData(mongoConnParam = mongoConnParam,
+                   pgConnParam = pgConnParam,
+                   designPoint = "NeilsTestScenario")
+
+```
+## Sensor Acquisition State Tables  
+
+Unlike the LOS table, this table shows the state of acquisition between each sensor target pair. It also shows the previous acquisition state so we can determine when the acquistion level changes. 
+
+```{r fct_low_etlSensorAcq}
+
+fct_low_etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint){
+  
+  requireNamespace(package = "magrittr")
+  
+  { # Complete the MongoDB Connection Parameters ----
+    
+    mongoConnParam[["collection"]] <- "AcquireModel.event.C2SimulationMessage"
+    
+    mongoConnParam[["query"]] <- sprintf("{\"designPoint\": \"%s\", \"event.messageData.javaClass\": \"sensorproto.SensorModel$DetectedTarget\"}",
+                                         designPoint)
+    
+    mongoConnParam[["fields"]] <- "{\"runId\": 1,\"runTime\": 1, \"designPoint\": 1,\"iteration\": 1, \"time\": 1, \"event.receiverId\": 1, \"event.senderId\": 1,\"event.messageData.any.sensorDetection\": 1}"
+    
+  } # close Complete the MongoDB Connection Parameters
+  
+  { # Extract ----
+    
+    message("Extracting data from the MongoDB")
+    
+    sensorAcqData <- modSim::sensorAcquisition(mongoUri = mongoConnParam[["mongoUri"]],
+                                               mongoDb = mongoConnParam[["mongoDb"]],
+                                               mongoCollection = mongoConnParam[["collection"]],
+                                               mongoQuery = mongoConnParam[["query"]],
+                                               mongoFields = mongoConnParam[["fields"]],
+                                               recursiveUnnests = c("event",
+                                                                    "messageData", 
+                                                                    "any", 
+                                                                    "sensorDetection"))
+  
+  } # close Extract 
+  
+  { # Transform and Load ----
+    
+    message("Transforming and loading sensorAcqState Data!")
+    
+    sensorAcqData <- sensorAcqData %>%
+      dplyr::rename("id" = "_id",
+                    "time_ms" = "time") %>%
+      dplyr::mutate(time_s = time_ms/1000,
+                    sensorAcqState_pkId = NA)
+    
+    query_sensorAcqData <- fillTableQuery(data = sensorAcqData,
+                                          tableName = paste0("\"sensorAcqState\" (",
+                                                             paste0("\"",
+                                                                    names(sensorAcqData),
+                                                                    "\"",
+                                                                    collapse = ","),
+                                                             ")"))
+    
+    #> This is required because pg uses the unquoted `DEFAULT` for its auto-incrementing columns.
+    query_sensorAcqData <- stringr::str_replace_all(string = query_sensorAcqData,
+                                                    pattern = "NULL",
+                                                    replacement = "DEFAULT")
+    
+    sendPgFillTableQuery(query = query_sensorAcqData,
+                         host = pgConnParam[["pgHost"]],
+                         port = pgConnParam[["pgPort"]],
+                         user = pgConnParam[["pgUser"]],
+                         password = pgConnParam[["pgPass"]],
+                         dbname = pgConnParam[["pgDb"]])
+    
+  } # close Transform and Load
+  
+} # close fct_low_etlSensorAcq
+
+```
+
+```{r test_fct_low_etlSensorAcq, eval=FALSE}
+
+#> These source files read in the mongoURI and mongoDb elements and the PostgreSQL connection objects.
+
+source("./connectionObjects/pgConnectionObj.R")
+source("./connectionObjects/mongoConnectionObj.R")
+
+#> Add to the pgConnParam the database name 
+
+pgConnParam[["pgDb"]] <- "modSim3"
+
+fct_low_etlSensorAcq(mongoConnParam = mongoConnParam,
+                     pgConnParam = pgConnParam,
+                     designPoint = "NeilsTestScenario")
+
+```
+
+# High Function  
+
+This function takes three elements as inputs, `mongoConnParam`, `pgConnParam`, and `designPoint` which are used by each of the low functions. Each low function queries and unpackes different collections from the Simulation MongoDB and stores them in the PostgreSQL Relational Database created in the previous step.  
+
+```{r fct_high_queryMongoAndFillPg}
+
+fct_high_queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint){
+  
+  message("Reading from MongDB Acquire.State.Sensor collection and writing to PostgreSQL sensorDescription, entityIdToName, sensorToEntityId, and unnestedSensorState tables.")
+  
+  fct_low_etlSensorToEntityMappingTables(mongoConnParam = mongoConnParam,
+                                         pgConnParam = pgConnParam,
+                                         designPoint = designPoint)
+  
+  message("Reading from MongoDB AcquireModel.event.LOSTargetStatus collection and writing to PostgreSQL losState table.")
+  
+  fct_low_etlLosData(mongoConnParam = mongoConnParam,
+                     pgConnParam = pgConnParam,
+                     designPoint = designPoint)
+  
+  message("Reading from MongoDb AcquireModel.event.C2SimulationMessage collection and writing to PostgreSQL sensorAcqState table.")
+  
+  fct_low_etlSensorAcq(mongoConnParam = mongoConnParam,
+                       pgConnParam = pgConnParam,
+                       designPoint = designPoint)
+  
+} # close fct_high_queryMongoAndFillPg
+
+```   
+
+This is how this function would be executed:  
+
+```{r, eval=FALSE}
+
+#> These source files read in the mongoURI and mongoDb elements and the PostgreSQL connection objects.
+
+source("./connectionObjects/pgConnectionObj.R")
+source("./connectionObjects/mongoConnectionObj.R")
+
+#> Add to the pgConnParam the database name 
+
+pgConnParam[["pgDb"]] <- "modSim4"
+
+#> Execute the function  
+
+fct_high_queryMongoAndFillPg(mongoConnParam = mongoConnParam,
+                             pgConnParam = pgConnParam,
+                             designPoint = "NeilsTestScenario")
+
+```
+
+
