@@ -42,4 +42,30 @@ queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint){
                        pgConnParam = pgConnParam,
                        designPoint = designPoint)
 
+  { # Refresh the materialized Views ----
+
+    #> After writing all of the data for this designPoint to the PostgreSQL
+    #>  database, update the materialized views so that the data is ready to be
+    #>  queried. Failing to do this negates the utility of having a pre-executed
+    #>  view ready to be queried.
+
+    pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                             host = pgConnParam[["pgHost"]],
+                             port = pgConnParam[["pgPort"]],
+                             user = pgConnParam[["pgUser"]],
+                             password = pgConnParam[["pgPass"]],
+                             dbname = pgConnParam[["pgDb"]])
+
+    DBI::dbSendQuery(conn = pgConn,
+                     statement = "REFRESH MATERIALIZED VIEW los_sensor_target_pairs_materialized")
+
+    DBI::dbSendQuery(conn = pgConn,
+                     statement = "REFRESH MATERIALIZED VIEW acq_sensor_target_pairs_materialized")
+
+    DBI::dbDisconnect(conn = pgConn)
+
+    rm(pgConn)
+
+  } # close Refresh the materialized Views section
+
 } # close fct_high_queryMongoAndFillPg
