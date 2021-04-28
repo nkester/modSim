@@ -19,10 +19,29 @@ These functions are executed once to establish the database and its tables in th
 Read in the list of PostgreSQL connection parameters and add the data base name to that list.
 
 ```{r fct_low_createModSim}
-
-fct_low_createModSimDb <- function(connParamList){
+#' Create ModSim PostgreSQL Database
+#'
+#' This function automates the creation of the specific PostgreSQL database used
+#'  to support this thesis work. It takes only a list of connection parameters
+#'  required to connect to the PostgreSQL instance. From that, it creates all
+#'  tables and materialized views used elsewhere in the analytic work flow. This
+#'  is purpose built and not meant to be a general use function.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param connParamList A five element named list containing the following elements:
+#'  "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".
+#'
+#' @return This returns messages as the build progresses and then a `NULL` response.
+#' @export createModSimDb
+#'
+#' @examples createModSimDb(connParamList = pgConnParam)
+#'
+#' @importFrom RPostgreSQL PostgreSQL
+#' @importFrom DBI dbConnect dbGetQuery dbSendQuery dbDisconnect
+createModSimDb <- function(connParamList){
   
-  { # Write Query Statements 
+  { # Write Query Statements
     
     createDatabase <- sprintf("CREATE DATABASE \"%s\"",
                               connParamList[["pgDb"]])
@@ -54,7 +73,7 @@ fct_low_createModSimDb <- function(connParamList){
                    \"runTime\" TEXT,
                    \"designPoint\" TEXT,
                    \"iteration\" TEXT,
-                   \"time_ms\" INTEGER,
+                   \"time_ms\" TEXT,
                    \"sensorId\" TEXT,
                    \"entityId\" TEXT,
                    \"acquireSensorType\" TEXT,
@@ -68,18 +87,18 @@ fct_low_createModSimDb <- function(connParamList){
                    \"runTime\" TEXT,
                    \"designPoint\" TEXT,
                    \"iteration\" TEXT,
-                   \"time_ms\" INTEGER,
-                   \"time_s\" NUMERIC,
+                   \"time_ms\" TEXT,
+                   \"time_s\" TEXT,
                    \"sensorId\" TEXT,
                    \"targetId\" TEXT,
-                   \"changeNumber\" INTEGER,
+                   \"changeNumber\" TEXT,
                    \"hasLOS\" BOOLEAN,
-                   \"hasLOSUpdateTime\" NUMERIC,
-                   \"characteristicDimension\" NUMERIC,
-                   \"characteristicDimensionUpdateTime\" NUMERIC,
+                   \"hasLOSUpdateTime\" TEXT,
+                   \"characteristicDimension\" TEXT,
+                   \"characteristicDimensionUpdateTime\" TEXT,
                    \"background\" TEXT,
-                   \"backgroundUpdateTime\" NUMERIC,
-                   \"nextUpdateTime\" NUMERIC)"
+                   \"backgroundUpdateTime\" TEXT,
+                   \"nextUpdateTime\" TEXT)"
     
     createSensorAcq <- "CREATE TABLE IF NOT EXISTS \"sensorAcqState\" (
                    \"sensorAcqState_pkId\" SERIAL PRIMARY KEY,
@@ -88,8 +107,8 @@ fct_low_createModSimDb <- function(connParamList){
                    \"runTime\" TEXT,
                    \"designPoint\" TEXT,
                    \"iteration\" TEXT,
-                   \"time_ms\" INTEGER,
-                   \"time_s\" NUMERIC,
+                   \"time_ms\" TEXT,
+                   \"time_s\" TEXT,
                    \"receiverId\" TEXT,
                    \"senderId\" TEXT,
                    \"sensorId\" TEXT,
@@ -97,7 +116,7 @@ fct_low_createModSimDb <- function(connParamList){
                    \"targetId\" TEXT,
                    \"detectionLevel\" TEXT,
                    \"previousDetectionLevel\" TEXT,
-                   \"timeToDetection\" NUMERIC)"
+                   \"timeToDetection\" TEXT)"
     
   } # close Write Query Statements
   
@@ -129,7 +148,7 @@ fct_low_createModSimDb <- function(connParamList){
                       ON los.\"sensorId\" = sens.\"sensorId\"
                       LEFT JOIN \"entityIdToName\" AS ent2
                         ON sens.\"entityId\" = ent2.\"entityId\"
-                " 
+                "
       
     } # close LOS Sensor Target Pairs
     
@@ -140,14 +159,14 @@ fct_low_createModSimDb <- function(connParamList){
       
       query_createAcqMatView <- "
                       CREATE MATERIALIZED VIEW acq_sensor_target_pairs_materialized AS
-                      SELECT 
+                      SELECT
                         acq.\"time_s\",
                         ent2.\"shortName\" AS \"sensorShortName\",
                         ent2.\"force\" AS \"sensorForce\",
                         ent1.\"shortName\" AS \"targetShortName\",
                         ent1.\"force\" AS \"targetForce\",
-                        CASE WHEN acq.\"detectionLevel\" = 'SENSOR_NODETECTION' THEN FALSE 
-                               ELSE TRUE 
+                        CASE WHEN acq.\"detectionLevel\" = 'SENSOR_NODETECTION' THEN FALSE
+                               ELSE TRUE
                              END AS \"hasAcq\",
                         acq.\"detectionLevel\",
                         acq.\"designPoint\",
@@ -255,7 +274,8 @@ fct_low_createModSimDb <- function(connParamList){
   message(sprintf("Complete: The %s database exists and all tables have been created!",
                   connParamList[["pgDb"]]))
   
-} # fct_low_createModSimDb
+} # close createModSimDb
+
 ```
 
 

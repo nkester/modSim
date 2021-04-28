@@ -52,7 +52,7 @@ createModSimDb <- function(connParamList){
                    \"runTime\" TEXT,
                    \"designPoint\" TEXT,
                    \"iteration\" TEXT,
-                   \"time_ms\" INTEGER,
+                   \"time_ms\" TEXT,
                    \"sensorId\" TEXT,
                    \"entityId\" TEXT,
                    \"acquireSensorType\" TEXT,
@@ -66,18 +66,18 @@ createModSimDb <- function(connParamList){
                    \"runTime\" TEXT,
                    \"designPoint\" TEXT,
                    \"iteration\" TEXT,
-                   \"time_ms\" INTEGER,
-                   \"time_s\" NUMERIC,
+                   \"time_ms\" TEXT,
+                   \"time_s\" TEXT,
                    \"sensorId\" TEXT,
                    \"targetId\" TEXT,
-                   \"changeNumber\" INTEGER,
+                   \"changeNumber\" TEXT,
                    \"hasLOS\" BOOLEAN,
-                   \"hasLOSUpdateTime\" NUMERIC,
-                   \"characteristicDimension\" NUMERIC,
-                   \"characteristicDimensionUpdateTime\" NUMERIC,
+                   \"hasLOSUpdateTime\" TEXT,
+                   \"characteristicDimension\" TEXT,
+                   \"characteristicDimensionUpdateTime\" TEXT,
                    \"background\" TEXT,
-                   \"backgroundUpdateTime\" NUMERIC,
-                   \"nextUpdateTime\" NUMERIC)"
+                   \"backgroundUpdateTime\" TEXT,
+                   \"nextUpdateTime\" TEXT)"
 
     createSensorAcq <- "CREATE TABLE IF NOT EXISTS \"sensorAcqState\" (
                    \"sensorAcqState_pkId\" SERIAL PRIMARY KEY,
@@ -86,8 +86,8 @@ createModSimDb <- function(connParamList){
                    \"runTime\" TEXT,
                    \"designPoint\" TEXT,
                    \"iteration\" TEXT,
-                   \"time_ms\" INTEGER,
-                   \"time_s\" NUMERIC,
+                   \"time_ms\" TEXT,
+                   \"time_s\" TEXT,
                    \"receiverId\" TEXT,
                    \"senderId\" TEXT,
                    \"sensorId\" TEXT,
@@ -95,7 +95,7 @@ createModSimDb <- function(connParamList){
                    \"targetId\" TEXT,
                    \"detectionLevel\" TEXT,
                    \"previousDetectionLevel\" TEXT,
-                   \"timeToDetection\" NUMERIC)"
+                   \"timeToDetection\" TEXT)"
 
   } # close Write Query Statements
 
@@ -253,4 +253,4 @@ createModSimDb <- function(connParamList){
   message(sprintf("Complete: The %s database exists and all tables have been created!",
                   connParamList[["pgDb"]]))
 
-}
+} # close createModSimDb
