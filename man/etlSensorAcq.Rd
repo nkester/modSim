@@ -4,7 +4,7 @@
 \alias{etlSensorAcq}
 \title{ETL Sensor Acquisition Data}
 \usage{
-etlSensorAcq(mongoConnParam, pgConnParam, designPoint)
+etlSensorAcq(mongoConnParam, pgConnParam, designPoint, batchSize)
 }
 \arguments{
 \item{pgConnParam}{A five element named list containing the following elements:
@@ -14,6 +14,9 @@ etlSensorAcq(mongoConnParam, pgConnParam, designPoint)
 would like to extract from the MongoDB and place into the PostgreSQL database.
 If multiple designPoints are required then execute this function multiple
 times. Note that this pulls ALL iterations executed for that designPoint.}
+
+\item{batchSize}{A numeric integer representing how many records you want to
+write to the PostgreSQL database at a time.}
 
 \item{mongoConnParamThis}{is a two element named list including the "mongoUri"
 which includes the user name and password and a single character string and
