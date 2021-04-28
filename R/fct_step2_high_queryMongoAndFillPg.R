@@ -16,31 +16,36 @@
 #'   would like to extract from the MongoDB and place into the PostgreSQL database.
 #'   If multiple designPoints are required then execute this function multiple
 #'   times. Note that this pulls ALL iterations executed for that designPoint.
+#' @param batchSize A numeric integer representing how many records you want to
+#'  write to the PostgreSQL database at a time.
 #'
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
 #'
 #' @export queryMongoAndFillPg
 #'
-queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint){
+queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint,batchSize=100){
 
   message("Reading from MongDB Acquire.State.Sensor collection and writing to PostgreSQL sensorDescription, entityIdToName, sensorToEntityId, and unnestedSensorState tables.")
 
   etlSensorToEntityMappingTables(mongoConnParam = mongoConnParam,
-                                         pgConnParam = pgConnParam,
-                                         designPoint = designPoint)
+                                 pgConnParam = pgConnParam,
+                                 designPoint = designPoint,
+                                 batchSize = batchSize)
 
   message("Reading from MongoDB AcquireModel.event.LOSTargetStatus collection and writing to PostgreSQL losState table.")
 
   etlLosData(mongoConnParam = mongoConnParam,
-                     pgConnParam = pgConnParam,
-                     designPoint = designPoint)
+             pgConnParam = pgConnParam,
+             designPoint = designPoint,
+             batchSize = batchSize)
 
   message("Reading from MongoDb AcquireModel.event.C2SimulationMessage collection and writing to PostgreSQL sensorAcqState table.")
 
   etlSensorAcq(mongoConnParam = mongoConnParam,
-                       pgConnParam = pgConnParam,
-                       designPoint = designPoint)
+               pgConnParam = pgConnParam,
+               designPoint = designPoint,
+               batchSize = batchSize)
 
   { # Refresh the materialized Views ----
 

@@ -4,7 +4,7 @@
 \alias{etlLosData}
 \title{ETL Line of Sight Data}
 \usage{
-etlLosData(mongoConnParam, pgConnParam, designPoint)
+etlLosData(mongoConnParam, pgConnParam, designPoint, batchSize)
 }
 \arguments{
 \item{mongoConnParam}{This is a two element named list including the "mongoUri"
@@ -18,6 +18,9 @@ the "mongoDb" name as a character string.}
 would like to extract from the MongoDB and place into the PostgreSQL database.
 If multiple designPoints are required then execute this function multiple
 times. Note that this pulls ALL iterations executed for that designPoint.}
+
+\item{batchSize}{A numeric integer representing how many records you want to
+write to the PostgreSQL database at a time.}
 }
 \value{
 This returns messages to the console updating the user on the function's
