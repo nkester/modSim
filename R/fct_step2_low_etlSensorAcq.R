@@ -15,12 +15,14 @@
 #'   would like to extract from the MongoDB and place into the PostgreSQL database.
 #'   If multiple designPoints are required then execute this function multiple
 #'   times. Note that this pulls ALL iterations executed for that designPoint.
+#' @param batchSize A numeric integer representing how many records you want to
+#'  write to the PostgreSQL database at a time.
 #'
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
 #'
 #' @importFrom dplyr rename mutate
-etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint){
+etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
 
   requireNamespace(package = "magrittr")
 
@@ -61,26 +63,11 @@ etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint){
       dplyr::mutate(time_s = time_ms/1000,
                     sensorAcqState_pkId = NA)
 
-    query_sensorAcqData <- fillTableQuery(data = sensorAcqData,
-                                          tableName = paste0("\"sensorAcqState\" (",
-                                                             paste0("\"",
-                                                                    names(sensorAcqData),
-                                                                    "\"",
-                                                                    collapse = ","),
-                                                             ")"),
-                                          serial = "DEFAULT")
-
-    #> This is required because pg uses the unquoted `DEFAULT` for its auto-incrementing columns.
-    # query_sensorAcqData <- stringr::str_replace_all(string = query_sensorAcqData,
-    #                                                 pattern = "NULL",
-    #                                                 replacement = "DEFAULT")
-
-    sendPgFillTableQuery(query = query_sensorAcqData,
-                         host = pgConnParam[["pgHost"]],
-                         port = pgConnParam[["pgPort"]],
-                         user = pgConnParam[["pgUser"]],
-                         password = pgConnParam[["pgPass"]],
-                         dbname = pgConnParam[["pgDb"]])
+    batch_fillAndWrite(data = sensorAcqData,
+                       pgConnParam = pgConnParam,
+                       tableName = "sensorAcqState",
+                       batchSize = batchSize,
+                       database = "PostgreSQL")
 
   } # close Transform and Load
 

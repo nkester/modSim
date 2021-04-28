@@ -16,13 +16,15 @@
 #'   would like to extract from the MongoDB and place into the PostgreSQL database.
 #'   If multiple designPoints are required then execute this function multiple
 #'   times. Note that this pulls ALL iterations executed for that designPoint.
+#' @param batchSize A numeric integer representing how many records you want to
+#'  write to the PostgreSQL database at a time.
 #'
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
 #'
 #' @importFrom dplyr distinct mutate case_when rename
 #' @importFrom stringr str_replace_all str_detect str_extract
-etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoint){
+etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
 
   requireNamespace(package = "magrittr")
 
@@ -74,28 +76,11 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoin
                                                     designPoint)[[1]],
                       sensorId_pkId = NA)
 
-      query_sensorDescription <- fillTableQuery(data = entitySensorMapping$SensorDescription,
-                                                tableName = paste0("\"sensorDescription\" (",
-                                                                   paste0("\"",
-                                                                          names(entitySensorMapping$SensorDescription),
-                                                                          "\"",
-                                                                          collapse = ","),
-                                                                   ")"),
-                                                serial = "DEFAULT")
-
-      #> This is required because pg uses the unquoted `DEFAULT` for its auto-incrementing columns.
-      # query_sensorDescription <- stringr::str_replace_all(string = query_sensorDescription,
-      #                                                     pattern = "NULL",
-      #                                                     replacement = "DEFAULT")
-
-      sendPgFillTableQuery(query = query_sensorDescription,
-                           host = pgConnParam[["pgHost"]],
-                           port = pgConnParam[["pgPort"]],
-                           user = pgConnParam[["pgUser"]],
-                           password = pgConnParam[["pgPass"]],
-                           dbname = pgConnParam[["pgDb"]])
-
-      rm(query_sensorDescription)
+      batch_fillAndWrite(data = entitySensorMapping$SensorDescription,
+                         pgConnParam = pgConnParam,
+                         tableName = "sensorDescription",
+                         batchSize = batchSize,
+                         database = "PostgreSQL")
 
     } # close sensorDescription section
 
@@ -118,27 +103,12 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoin
                                                        pattern = "[^/]*$"),
                       entityId_pkId = NA)
 
-      query_entityIdToName <- fillTableQuery(data = entitySensorMapping$EntityIdToName,
-                                             tableName = paste0("\"entityIdToName\" (",
-                                                                paste0("\"",
-                                                                       names(entitySensorMapping$EntityIdToName),
-                                                                       "\"",
-                                                                       collapse = ","),
-                                                                ")"))
+      batch_fillAndWrite(data = entitySensorMapping$EntityIdToName,
+                         pgConnParam = pgConnParam,
+                         tableName = "entityIdToName",
+                         batchSize = batchSize,
+                         database = "PostgreSQL")
 
-      #> This is required because pg uses the unquoted `DEFAULT` for its auto-incrementing columns.
-      query_entityIdToName <- stringr::str_replace_all(string = query_entityIdToName,
-                                                       pattern = "NULL",
-                                                       replacement = "DEFAULT")
-
-      sendPgFillTableQuery(query = query_entityIdToName,
-                           host = pgConnParam[["pgHost"]],
-                           port = pgConnParam[["pgPort"]],
-                           user = pgConnParam[["pgUser"]],
-                           password = pgConnParam[["pgPass"]],
-                           dbname = pgConnParam[["pgDb"]])
-
-      rm(query_entityIdToName)
 
     } # close entityIdToName section
 
@@ -152,28 +122,11 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoin
                                                     designPoint)[[1]],
                       sensorToEntityId_pkId = NA)
 
-      query_sensorToEntityId <- fillTableQuery(data = entitySensorMapping$SensorToEntityId,
-                                               tableName = paste0("\"sensorToEntityId\" (",
-                                                                  paste0("\"",
-                                                                         names(entitySensorMapping$SensorToEntityId),
-                                                                         "\"",
-                                                                         collapse = ","),
-                                                                  ")"),
-                                               serial = "DEFAULT")
-
-      #> This is required because pg uses the unquoted `DEFAULT` for its auto-incrementing columns.
-      # query_sensorToEntityId <- stringr::str_replace_all(string = query_sensorToEntityId,
-      #                                                    pattern = "NULL",
-      #                                                    replacement = "DEFAULT")
-
-      sendPgFillTableQuery(query = query_sensorToEntityId,
-                           host = pgConnParam[["pgHost"]],
-                           port = pgConnParam[["pgPort"]],
-                           user = pgConnParam[["pgUser"]],
-                           password = pgConnParam[["pgPass"]],
-                           dbname = pgConnParam[["pgDb"]])
-
-      rm(query_sensorToEntityId)
+      batch_fillAndWrite(data = entitySensorMapping$SensorToEntityId,
+                         pgConnParam = pgConnParam,
+                         tableName = "sensorToEntityId",
+                         batchSize = batchSize,
+                         database = "PostgreSQL")
 
     } # close sensorToEntityId section
 
@@ -188,23 +141,11 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoin
                       "id" = "_id",
                       "time_ms" = "time")
 
-      query_unnestedSensorState <- fillTableQuery(data = entitySensorMapping$UnnestedSensorState,
-                                                  tableName = paste0("\"unnestedSensorState\" (",
-                                                                     paste0("\"",
-                                                                            names(entitySensorMapping$UnnestedSensorState),
-                                                                            "\"",
-                                                                            collapse = ","),
-                                                                     ")"),
-                                                  serial = "DEFAULT")
-
-      sendPgFillTableQuery(query = query_unnestedSensorState,
-                           host = pgConnParam[["pgHost"]],
-                           port = pgConnParam[["pgPort"]],
-                           user = pgConnParam[["pgUser"]],
-                           password = pgConnParam[["pgPass"]],
-                           dbname = pgConnParam[["pgDb"]])
-
-      rm(query_unnestedSensorState)
+      batch_fillAndWrite(data = entitySensorMapping$UnnestedSensorState,
+                         pgConnParam = pgConnParam,
+                         tableName = "unnestedSensorState",
+                         batchSize = batchSize,
+                         database = "PostgreSQL")
 
     } # close unnestedSensorState section
 

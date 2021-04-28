@@ -15,13 +15,15 @@
 #'   would like to extract from the MongoDB and place into the PostgreSQL database.
 #'   If multiple designPoints are required then execute this function multiple
 #'   times. Note that this pulls ALL iterations executed for that designPoint.
+#' @param batchSize A numeric integer representing how many records you want to
+#'  write to the PostgreSQL database at a time.
 #'
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
 #'
 #' @importFrom dplyr rename mutate
 #' @importFrom stringr str_replace_all
-etlLosData <- function(mongoConnParam,pgConnParam,designPoint){
+etlLosData <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
 
   requireNamespace(package = "magrittr")
 
@@ -41,12 +43,12 @@ etlLosData <- function(mongoConnParam,pgConnParam,designPoint){
 
     message("Extracting data from the MongoDB")
 
-    losData <- modSim::mongoUnnest(mongoUri = mongoConnParam[["mongoUri"]],
-                                   mongoDb = mongoConnParam[["mongoDb"]],
-                                   mongoCollection = mongoConnParam[["collection"]],
-                                   mongoFields = mongoConnParam[["fields"]],
-                                   mongoQuery = mongoConnParam[["query"]],
-                                   unnestCols = "event")
+    losData <- mongoUnnest(mongoUri = mongoConnParam[["mongoUri"]],
+                           mongoDb = mongoConnParam[["mongoDb"]],
+                           mongoCollection = mongoConnParam[["collection"]],
+                           mongoFields = mongoConnParam[["fields"]],
+                           mongoQuery = mongoConnParam[["query"]],
+                           unnestCols = "event")
 
   } # close Extract
 
@@ -60,29 +62,12 @@ etlLosData <- function(mongoConnParam,pgConnParam,designPoint){
       dplyr::mutate(time_s = time_ms/1000,
                     losState_pkId = NA)
 
-    query_losData <- fillTableQuery(data = losData,
-                                    tableName = paste0("\"losState\" (",
-                                                       paste0("\"",
-                                                              names(losData),
-                                                              "\"",
-                                                              collapse = ","),
-                                                       ")"),
-                                    serial = "DEFAULT")
-
-    #> This is required because pg uses the unquoted `DEFAULT` for its auto-incrementing columns.
-    # query_losData <- stringr::str_replace_all(string = query_losData,
-    #                                           pattern = "NULL",
-    #                                           replacement = "DEFAULT")
-
-    sendPgFillTableQuery(query = query_losData,
-                         host = pgConnParam[["pgHost"]],
-                         port = pgConnParam[["pgPort"]],
-                         user = pgConnParam[["pgUser"]],
-                         password = pgConnParam[["pgPass"]],
-                         dbname = pgConnParam[["pgDb"]])
+    batch_fillAndWrite(data = losData,
+                       pgConnParam = pgConnParam,
+                       tableName = "losState",
+                       batchSize = batchSize,
+                       database = "PostgreSQL")
 
   } # close Transform and Load
-
-  rm(query_losData)
 
 } # close fct_low_etlLosData
