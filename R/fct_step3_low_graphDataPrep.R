@@ -17,7 +17,7 @@
 #' @importFrom dplyr mutate distinct_all filter group_by summarise ungroup
 #'  select n left_join
 #' @importFrom tidyr unnest fill replace_na
-low_graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
+graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
 
   { # LOS Data Prep
 

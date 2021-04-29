@@ -16,7 +16,7 @@
 #'  and the ACQ Materialized View queries.
 #'
 #' @importFrom DBI dbConnect dbGetQuery dbDisconnect
-low_queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
+queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
 
   pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
                            host = pgConnParam[["pgHost"]],
