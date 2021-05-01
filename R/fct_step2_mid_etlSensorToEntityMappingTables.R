@@ -1,9 +1,8 @@
 #' ETL Sensor To Entity Mapping Tables
 #'
 #' This function queries the simulation's MongoDB, extracting specific information
-#'   from the state.sensors collection, transforms it by unnesting and relating
-#'   the fields. Finally, it writes the resulting data to tables in PostgreSQL
-#'   created by the `createModSimDb` function.
+#'   from the state.sensors collection, and it writes the resulting data to tables
+#'   in PostgreSQL created by the `createModSimDb` function.
 #'
 #' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
@@ -24,21 +23,18 @@
 #'
 #' @importFrom dplyr distinct mutate case_when rename
 #' @importFrom stringr str_replace_all str_detect str_extract
-etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
+#'
+#' @note Location: ./R/fct_step2_mid_etlSensorToEntityMappingTables.R
+etlSensorToEntityMappingTables <- function(mongoConnParam,
+                                           pgConnParam,
+                                           designPoint,
+                                           batchSize){
 
   requireNamespace(package = "magrittr")
 
   { # Complete the MongoDB Connection Parameters ----
 
     mongoConnParam[["collection"]] <- "AcquireModel.state.sensors"
-
-    mongoConnParam[["query"]] <- sprintf("{\"designPoint\": \"%s\"}",
-                                         designPoint)
-
-    mongoConnParam[["fields"]] <- "{\"_id\": 1, \"runId\": 1, \"runTime\": 1,
-  \"designPoint\": 1, \"iteration\": 1, \"time\": 1, \"state.sensorId\": 1,
-  \"state.entityId\": 1, \"state.acquireSensorType\": 1,
-  \"state.magnification\": 1, \"state.status.source\": 1}"
 
   } # close Complete the MongoDB Connection Parameters
 
@@ -48,17 +44,13 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoin
 
       message("Extracting data from MongoDB")
 
-      # entitySensorMapping <- modSim::mapSensorsAndEntities(mongoUri = mongoConnParam[["mongoUri"]],
-      #                                                      mongoDb = mongoConnParam[["mongoDb"]],
-      #                                                      mongoCollection = mongoConnParam[["collection"]],
-      #                                                      mongoFields = mongoConnParam[["fields"]],
-      #                                                      mongoQuery = mongoConnParam[["query"]])
-
       entitySensorMapping <- mapSensorsAndEntities(mongoUri = mongoConnParam[["mongoUri"]],
-                                                           mongoDb = mongoConnParam[["mongoDb"]],
-                                                           mongoCollection = mongoConnParam[["collection"]])
+                                                   mongoDb = mongoConnParam[["mongoDb"]],
+                                                   mongoCollection = mongoConnParam[["collection"]],
+                                                   designPoint)
 
       metaData <- entitySensorMapping$metaData
+
     } # close Query MongoDb and unnest information about sensors and entities section
 
   } # close Extract section
@@ -129,25 +121,6 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoin
 
     } # close sensorToEntityId section
 
-    { # unnestedSensorState ----
-
-      # message("Transforming and loading unnestedSensorState data.")
-      #
-      # #> This is the full set of un-nested data from the original query. While not truly "raw", this could be considered the original data set.
-      #
-      # entitySensorMapping$UnnestedSensorState <- entitySensorMapping$UnnestedSensorState %>%
-      #   dplyr::rename(.data = .,
-      #                 "id" = "_id",
-      #                 "time_ms" = "time")
-      #
-      # batch_fillAndWrite(data = entitySensorMapping$UnnestedSensorState,
-      #                    pgConnParam = pgConnParam,
-      #                    tableName = "unnestedSensorState",
-      #                    batchSize = batchSize,
-      #                    database = "PostgreSQL")
-
-    } # close unnestedSensorState section
-
   } # close Transform and Load section
 
-} # close fct_low_etlSensorToEntityMappingTables
+} # close fct_step2_mid_etlSensorToEntityMappingTables
