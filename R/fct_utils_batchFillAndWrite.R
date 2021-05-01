@@ -3,18 +3,28 @@
 #' This is a utility function used in modSim to take a set of data, break it up
 #'  into batches and write it to the required PostgreSQL database.
 #'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
 #' @param data A tibble of data
 #' @param pgConnParam The connection strings required to connect to the PostgreSQL
 #'  database of choice.
 #' @param tableName The table of the PostgreSQL table this data is to be inserted
-#'  into.
+#'  into. It should include `\\"` around names requiring preservation of case.
+#'  Optionally: It can include the SQL Field name specification to deal with a
+#'  tibble that may not be ordered the same as the SQL Table. This should look
+#'  like: `"\"tableName\" (\"fieldOneName\",\"fieldTwoName\")"`
 #' @param batchSize How many records to execute at a time.
 #' @param database What type of database is it going into? Options are: PostgreSQL
 #'  or SQLite.
 #'
 #' @return Returns nothing
 #'
-batch_fillAndWrite <- function(data,pgConnParam,tableName,batchSize=100,database = "PostgreSQL"){
+#' @note Location: ./R/fct_utils_batchFillAndWrite.R
+batch_fillAndWrite <- function(data,
+                               pgConnParam,
+                               tableName,
+                               batchSize=100,
+                               database = "PostgreSQL"){
 
   if(database == "PostgreSQL"){
 
@@ -90,4 +100,4 @@ batch_fillAndWrite <- function(data,pgConnParam,tableName,batchSize=100,database
   }
 
 
-}
+} # batch_fillAndWrite
