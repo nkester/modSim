@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE,
 
 These functions are executed once to establish the database and its tables in the Analytic Environment's PostgreSQL instance. They assume the `modSim` database does not already exist.
 
-## Create the `modSim` Database and All Required Tables  
+## Create the `modSim` Database and All Required Tables: `createModSimDb()`  
 
 Read in the list of PostgreSQL connection parameters and add the data base name to that list.
 
@@ -33,12 +33,16 @@ Read in the list of PostgreSQL connection parameters and add the data base name 
 #'  "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".
 #'
 #' @return This returns messages as the build progresses and then a `NULL` response.
+#'
 #' @export createModSimDb
 #'
 #' @examples createModSimDb(connParamList = pgConnParam)
 #'
 #' @importFrom RPostgreSQL PostgreSQL
 #' @importFrom DBI dbConnect dbGetQuery dbSendQuery dbDisconnect
+#' @importFrom magrittr %>%
+#'
+#' @note Location: ./R/fct_step1_createModSimDb.R
 createModSimDb <- function(connParamList){
   
   { # Write Query Statements
@@ -91,14 +95,7 @@ createModSimDb <- function(connParamList){
                    \"time_s\" TEXT,
                    \"sensorId\" TEXT,
                    \"targetId\" TEXT,
-                   \"changeNumber\" TEXT,
-                   \"hasLOS\" BOOLEAN,
-                   \"hasLOSUpdateTime\" TEXT,
-                   \"characteristicDimension\" TEXT,
-                   \"characteristicDimensionUpdateTime\" TEXT,
-                   \"background\" TEXT,
-                   \"backgroundUpdateTime\" TEXT,
-                   \"nextUpdateTime\" TEXT)"
+                   \"hasLOS\" BOOLEAN)"
     
     createSensorAcq <- "CREATE TABLE IF NOT EXISTS \"sensorAcqState\" (
                    \"sensorAcqState_pkId\" SERIAL PRIMARY KEY,
@@ -128,7 +125,7 @@ createModSimDb <- function(connParamList){
       #> Refresh with: "REFRESH MATERIALIZED VIEW CONCURRENTLY los_sensor_target_pairs_materialized"
       
       query_createLosMatView <- "
-                CREATE MATERIALIZED VIEW los_sensor_target_pairs_materialized AS
+                CREATE MATERIALIZED VIEW IF NOT EXISTS los_sensor_target_pairs_materialized AS
                 SELECT
                   los.\"time_s\",
                   ent2.\"shortName\" AS \"sensorShortName\",
@@ -158,7 +155,7 @@ createModSimDb <- function(connParamList){
       #> Refresh with: "REFRESH MATERIALIZED VIEW CONCURRENTLY acq_sensor_target_pairs_materialized"
       
       query_createAcqMatView <- "
-                      CREATE MATERIALIZED VIEW acq_sensor_target_pairs_materialized AS
+                      CREATE MATERIALIZED VIEW IF NOT EXISTS acq_sensor_target_pairs_materialized AS
                       SELECT
                         acq.\"time_s\",
                         ent2.\"shortName\" AS \"sensorShortName\",
@@ -277,11 +274,24 @@ createModSimDb <- function(connParamList){
 } # close createModSimDb
 
 ```
+# Execution  
 
+This is how this function would be executed. Note, the following is the structure of the input parameters.  
 
-Execute the `fct_low_createModSim` function:  
+pgConnParam:  
 
-```{r}
+```{r, echo=FALSE}
+list("pgHost" = "<host.path.to.postgreSQL>",
+     "pgPort" = 5432,
+     "pgUser" = "<username>",
+     "pgPass" = "<password>",
+     "pgDb" = "<databaseName>")
+```
+
+Execute the `createModSim()` function:  
+
+```{r,eval=FALSE}
+#> This source file reads in the PostgreSQL connection objects.
 
 source("./connectionObjects/pgConnectionObj.R")
 

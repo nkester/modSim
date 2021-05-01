@@ -12,12 +12,16 @@
 #'  "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".
 #'
 #' @return This returns messages as the build progresses and then a `NULL` response.
+#'
 #' @export createModSimDb
 #'
 #' @examples createModSimDb(connParamList = pgConnParam)
 #'
 #' @importFrom RPostgreSQL PostgreSQL
 #' @importFrom DBI dbConnect dbGetQuery dbSendQuery dbDisconnect
+#' @importFrom magrittr %>%
+#'
+#' @note Location: ./R/fct_step1_createModSimDb.R
 createModSimDb <- function(connParamList){
 
   { # Write Query Statements
