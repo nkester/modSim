@@ -26,7 +26,9 @@
 #' @importFrom tibble tibble
 #'
 #' @note Location: ./R/fct_step2_low_etlSensorAcq.R
-etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint){
+etlSensorAcq <- function(mongoConnParam,
+                         pgConnParam,
+                         designPoint){
 
   { # Complete the MongoDB Connection Parameters ----
 

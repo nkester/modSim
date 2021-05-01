@@ -24,7 +24,11 @@
 #'
 #' @export queryMongoAndFillPg
 #'
-queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint,batchSize=100){
+#' @note Location: ./R/fct_step2_high_queryMongoAndFillPg.R
+queryMongoAndFillPg <- function(mongoConnParam,
+                                pgConnParam,
+                                designPoint,
+                                batchSize=100){
 
   message("Reading from MongDB Acquire.State.Sensor collection and writing to PostgreSQL sensorDescription, entityIdToName, sensorToEntityId, and unnestedSensorState tables.")
 
@@ -37,15 +41,13 @@ queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint,batchSize
 
   etlLosData(mongoConnParam = mongoConnParam,
              pgConnParam = pgConnParam,
-             designPoint = designPoint,
-             batchSize = batchSize)
+             designPoint = designPoint)
 
   message("Reading from MongoDb AcquireModel.event.C2SimulationMessage collection and writing to PostgreSQL sensorAcqState table.")
 
   etlSensorAcq(mongoConnParam = mongoConnParam,
                pgConnParam = pgConnParam,
-               designPoint = designPoint,
-               batchSize = batchSize)
+               designPoint = designPoint)
 
   { # Refresh the materialized Views ----
 

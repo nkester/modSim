@@ -20,8 +20,10 @@
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
 #'
-#' @importFrom dplyr rename mutate
-#' @importFrom stringr str_replace_all
+#' @importFrom mongolite mongo
+#' @importFrom RPostgreSQL PostgreSQL
+#' @importFrom DBI dbConnect dbSendQuery dbDisconnect
+#' @importFrom tibble tibble
 #'
 #' @note Location: ./R/fct_step2_low_etlLosData.R
 etlLosData <- function(mongoConnParam,

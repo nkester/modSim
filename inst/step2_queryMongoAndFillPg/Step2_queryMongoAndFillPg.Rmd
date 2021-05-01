@@ -250,8 +250,10 @@ This table describes when a sensor target has Line of Sight (LOS). This does not
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
 #'
-#' @importFrom dplyr rename mutate
-#' @importFrom stringr str_replace_all
+#' @importFrom mongolite mongo
+#' @importFrom RPostgreSQL PostgreSQL
+#' @importFrom DBI dbConnect dbSendQuery dbDisconnect
+#' @importFrom tibble tibble
 #'
 #' @note Location: ./R/fct_step2_low_etlLosData.R
 etlLosData <- function(mongoConnParam,
@@ -380,7 +382,9 @@ Unlike the LOS table, this table shows the state of acquisition between each sen
 #' @importFrom tibble tibble
 #'
 #' @note Location: ./R/fct_step2_low_etlSensorAcq.R
-etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint){
+etlSensorAcq <- function(mongoConnParam,
+                         pgConnParam,
+                         designPoint){
 
   { # Complete the MongoDB Connection Parameters ----
     
@@ -523,7 +527,7 @@ These tables provide maps to the various entity and sensor Ids produced by the s
 #'   status but returns no information.
 #'
 #' @importFrom dplyr distinct mutate case_when rename
-#' @importFrom stringr str_replace_all str_detect str_extract
+#' @importFrom stringr str_detect str_extract
 #'
 #' @note Location: ./R/fct_step2_mid_etlSensorToEntityMappingTables.R
 etlSensorToEntityMappingTables <- function(mongoConnParam,
@@ -677,7 +681,11 @@ This function takes three elements as inputs, `mongoConnParam`, `pgConnParam`, a
 #'
 #' @export queryMongoAndFillPg
 #'
-queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint,batchSize=100){
+#' @note Location: ./R/fct_step2_high_queryMongoAndFillPg.R
+queryMongoAndFillPg <- function(mongoConnParam,
+                                pgConnParam,
+                                designPoint,
+                                batchSize=100){
   
   message("Reading from MongDB Acquire.State.Sensor collection and writing to PostgreSQL sensorDescription, entityIdToName, sensorToEntityId, and unnestedSensorState tables.")
   
@@ -696,8 +704,7 @@ queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint,batchSize
   
   etlSensorAcq(mongoConnParam = mongoConnParam,
                pgConnParam = pgConnParam,
-               designPoint = designPoint,
-               batchSize = batchSize)
+               designPoint = designPoint)
   
   { # Refresh the materialized Views ----
     

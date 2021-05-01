@@ -22,7 +22,7 @@
 #'   status but returns no information.
 #'
 #' @importFrom dplyr distinct mutate case_when rename
-#' @importFrom stringr str_replace_all str_detect str_extract
+#' @importFrom stringr str_detect str_extract
 #'
 #' @note Location: ./R/fct_step2_mid_etlSensorToEntityMappingTables.R
 etlSensorToEntityMappingTables <- function(mongoConnParam,
