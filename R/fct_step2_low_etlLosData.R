@@ -39,35 +39,95 @@ etlLosData <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
 
   } # close Complete the MongoDB Connection Parameters
 
-  { # Extract ----
+  { # Iterate
 
-    message("Extracting data from the MongoDB")
+    message("Beginning Iteration")
 
-    losData <- mongoUnnest(mongoUri = mongoConnParam[["mongoUri"]],
-                           mongoDb = mongoConnParam[["mongoDb"]],
-                           mongoCollection = mongoConnParam[["collection"]],
-                           mongoFields = mongoConnParam[["fields"]],
-                           mongoQuery = mongoConnParam[["query"]],
-                           unnestCols = "event")
+    mongoConn <- mongolite::mongo(url = mongoConnParam$mongoUri,
+                                  db = mongoConnParam$mongoDb,
+                                  collection = mongoConnParam$collection)
 
-  } # close Extract
+    numRecs <- mongoConn$count(query = mongoConnParam$query)
 
-  { # Transform and Load ----
+    it <- mongoConn$iterate(query = mongoConnParam$query,
+                            fields = mongoConnParam$fields)
 
-    message("Transforming and loading losData")
+    pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                             host = pgConnParam$pgHost,
+                             port = pgConnParam$pgPort,
+                             user = pgConnParam$pgUser,
+                             password = pgConnParam$pgPass,
+                             dbname = pgConnParam$pgDb)
 
-    losData <- losData %>%
-      dplyr::rename("id" = "_id",
-                    "time_ms" = "time") %>%
-      dplyr::mutate(time_s = time_ms/1000,
-                    losState_pkId = NA)
+    rdx <- 1
 
-    batch_fillAndWrite(data = losData,
-                       pgConnParam = pgConnParam,
-                       tableName = "losState",
-                       batchSize = batchSize,
-                       database = "PostgreSQL")
+    while(!is.null(x <- it$one())){
+      #Testing
+      #for(idx in 1:1000){
 
-  } # close Transform and Load
+      message(paste0("LOS Row: ",as.character(rdx),
+                     "  % comp: ",round(x = rdx/numRecs,
+                                        digits = 3)*100))
+
+      x <- it$one()
+
+      temp <- tibble::tibble("losState_pkid" = NA,
+                             "id" = x$`_id`,
+                             "runId" = x$runId,
+                             "runTime" = x$runTime,
+                             "designPoint" = x$designPoint,
+                             "iteration" = x$iteration,
+                             "time_ms" = x$time,
+                             "time_s" = x$time/1000,
+                             "sensorId" = x$event$sensorId,
+                             "targetId" = x$event$targetId,
+                             "hasLOS" = x$event$hasLOS)
+
+      temp_query <- fillTableQuery(data = temp,tableName = "\"losState\"",serial = "DEFAULT")
+
+      DBI::dbSendQuery(conn = pgConn,
+                       statement = temp_query)
+
+      rdx <- rdx + 1
+
+    }
+
+    DBI::dbDisconnect(conn = pgConn)
+    mongoConn$disconnect()
+
+  } # close Iterate
+
+  # { # Extract ----
+  #
+  #   message("Extracting data from the MongoDB")
+  #
+  #   losData <- mongoUnnest(mongoUri = mongoConnParam[["mongoUri"]],
+  #                          mongoDb = mongoConnParam[["mongoDb"]],
+  #                          mongoCollection = mongoConnParam[["collection"]],
+  #                          mongoFields = mongoConnParam[["fields"]],
+  #                          mongoQuery = mongoConnParam[["query"]],
+  #                          unnestCols = "event")
+  #
+  # } # close Extract
+
+  # { # Transform and Load ----
+  #
+  #   message("Transforming and loading losData")
+  #
+  #   losData <- losData %>%
+  #     dplyr::rename("id" = "_id",
+  #                   "time_ms" = "time") %>%
+  #     dplyr::mutate(time_s = time_ms/1000,
+  #                   losState_pkId = NA)
+  #
+  #   batch_fillAndWrite(data = losData,
+  #                      pgConnParam = pgConnParam,
+  #                      tableName = "losState",
+  #                      batchSize = batchSize,
+  #                      database = "PostgreSQL")
+  #
+  # } # close Transform and Load
+
+  message("LOS Complete")
 
 } # close fct_low_etlLosData

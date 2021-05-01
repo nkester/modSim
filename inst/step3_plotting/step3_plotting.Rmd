@@ -31,7 +31,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #'  and the ACQ Materialized View queries.
 #'  
 #' @importFrom DBI dbConnect dbGetQuery dbDisconnect
-low_queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
+queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
   
   pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
                            host = pgConnParam[["pgHost"]],
@@ -94,7 +94,7 @@ low_queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
 #' @importFrom dplyr mutate distinct_all filter group_by summarise ungroup
 #'  select n left_join
 #' @importFrom tidyr unnest fill replace_na
-low_graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
+graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
 
   { # LOS Data Prep
 
@@ -316,7 +316,7 @@ source("./connectionObjects/mongoConnectionObj.R")
 pgConnParam[["pgDb"]] <- "modSim"
 
 
-designPoint <- "WASP1_high_high_20210426"
+designPoints <- "WASP1_high_high_20210426"
 designPoint <- "WASP1_low_low_20210426"
 
 designPoints <- c("WASP1_high_high_20210426","WASP1_low_low_20210426")

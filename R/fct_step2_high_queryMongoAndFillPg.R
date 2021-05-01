@@ -73,4 +73,6 @@ queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint,batchSize
 
   } # close Refresh the materialized Views section
 
+  return("Complete!")
+
 } # close fct_high_queryMongoAndFillPg

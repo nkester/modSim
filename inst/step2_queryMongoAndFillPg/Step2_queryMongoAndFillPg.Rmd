@@ -258,20 +258,20 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoin
     
     { # unnestedSensorState ----
       
-      message("Transforming and loading unnestedSensorState data.")
-      
-      #> This is the full set of un-nested data from the original query. While not truly "raw", this could be considered the original data set.
-      
-      entitySensorMapping$UnnestedSensorState <- entitySensorMapping$UnnestedSensorState %>%
-        dplyr::rename(.data = .,
-                      "id" = "_id",
-                      "time_ms" = "time")
-      
-      batch_fillAndWrite(data = entitySensorMapping$UnnestedSensorState,
-                         pgConnParam = pgConnParam,
-                         tableName = "unnestedSensorState",
-                         batchSize = batchSize,
-                         database = "PostgreSQL")
+      # message("Transforming and loading unnestedSensorState data.")
+      # 
+      # #> This is the full set of un-nested data from the original query. While not truly "raw", this could be considered the original data set.
+      # 
+      # entitySensorMapping$UnnestedSensorState <- entitySensorMapping$UnnestedSensorState %>%
+      #   dplyr::rename(.data = .,
+      #                 "id" = "_id",
+      #                 "time_ms" = "time")
+      # 
+      # batch_fillAndWrite(data = entitySensorMapping$UnnestedSensorState,
+      #                    pgConnParam = pgConnParam,
+      #                    tableName = "unnestedSensorState",
+      #                    batchSize = batchSize,
+      #                    database = "PostgreSQL")
       
     } # close unnestedSensorState section
     
@@ -347,36 +347,96 @@ etlLosData <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
     
   } # close Complete the MongoDB Connection Parameters
   
-  { # Extract ----
+  { # Iterate
     
-    message("Extracting data from the MongoDB")
+    message("Beginning Iteration")
     
-    losData <- mongoUnnest(mongoUri = mongoConnParam[["mongoUri"]],
-                           mongoDb = mongoConnParam[["mongoDb"]],
-                           mongoCollection = mongoConnParam[["collection"]],
-                           mongoFields = mongoConnParam[["fields"]],
-                           mongoQuery = mongoConnParam[["query"]],
-                           unnestCols = "event")
+    mongoConn <- mongolite::mongo(url = mongoConnParam$mongoUri,
+                                  db = mongoConnParam$mongoDb,
+                                  collection = mongoConnParam$collection)
     
-  } # close Extract
+    numRecs <- mongoConn$count(query = mongoConnParam$query)
+    
+    it <- mongoConn$iterate(query = mongoConnParam$query,
+                            fields = mongoConnParam$fields)
+    
+    pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                             host = pgConnParam$pgHost,
+                             port = pgConnParam$pgPort,
+                             user = pgConnParam$pgUser,
+                             password = pgConnParam$pgPass,
+                             dbname = pgConnParam$pgDb)
+    
+    rdx <- 1
+    
+    while(!is.null(x <- it$one())){
+    #Testing
+    #for(idx in 1:1000){ 
+      
+      message(paste0("LOS Row: ",as.character(rdx),
+                     "  % comp: ",round(x = rdx/numRecs,
+                                        digits = 3)*100))
+      
+      x <- it$one()
+      
+      temp <- tibble::tibble("losState_pkid" = NA,
+                             "id" = x$`_id`,
+                             "runId" = x$runId,
+                             "runTime" = x$runTime,
+                             "designPoint" = x$designPoint,
+                             "iteration" = x$iteration,
+                             "time_ms" = x$time,
+                             "time_s" = x$time/1000,
+                             "sensorId" = x$event$sensorId,
+                             "targetId" = x$event$targetId,
+                             "hasLOS" = x$event$hasLOS) 
+      
+      temp_query <- fillTableQuery(data = temp,tableName = "\"losState\"",serial = "DEFAULT")
+      
+      DBI::dbSendQuery(conn = pgConn,
+                       statement = temp_query)
+      
+      rdx <- rdx + 1
+      
+    }
+    
+    DBI::dbDisconnect(conn = pgConn)
+    mongoConn$disconnect()
+    
+  } # close Iterate
   
-  { # Transform and Load ----
-    
-    message("Transforming and loading losData")
-    
-    losData <- losData %>%
-      dplyr::rename("id" = "_id",
-                    "time_ms" = "time") %>%
-      dplyr::mutate(time_s = time_ms/1000,
-                    losState_pkId = NA)
-    
-    batch_fillAndWrite(data = losData,
-                       pgConnParam = pgConnParam,
-                       tableName = "losState",
-                       batchSize = batchSize,
-                       database = "PostgreSQL")
-    
-  } # close Transform and Load
+  # { # Extract ----
+  #   
+  #   message("Extracting data from the MongoDB")
+  #   
+  #   losData <- mongoUnnest(mongoUri = mongoConnParam[["mongoUri"]],
+  #                          mongoDb = mongoConnParam[["mongoDb"]],
+  #                          mongoCollection = mongoConnParam[["collection"]],
+  #                          mongoFields = mongoConnParam[["fields"]],
+  #                          mongoQuery = mongoConnParam[["query"]],
+  #                          unnestCols = "event")
+  #   
+  # } # close Extract
+  
+  # { # Transform and Load ----
+  #   
+  #   message("Transforming and loading losData")
+  #   
+  #   losData <- losData %>%
+  #     dplyr::rename("id" = "_id",
+  #                   "time_ms" = "time") %>%
+  #     dplyr::mutate(time_s = time_ms/1000,
+  #                   losState_pkId = NA)
+  #   
+  #   batch_fillAndWrite(data = losData,
+  #                      pgConnParam = pgConnParam,
+  #                      tableName = "losState",
+  #                      batchSize = batchSize,
+  #                      database = "PostgreSQL")
+  #   
+  # } # close Transform and Load
+  
+  message("LOS Complete")
   
 } # close fct_low_etlLosData
 
@@ -443,39 +503,104 @@ etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
     
   } # close Complete the MongoDB Connection Parameters
   
-  { # Extract ----
+  { # Iterate
     
-    message("Extracting data from the MongoDB")
+    message("Beginning Iteration")
     
-    sensorAcqData <- modSim::sensorAcquisition(mongoUri = mongoConnParam[["mongoUri"]],
-                                               mongoDb = mongoConnParam[["mongoDb"]],
-                                               mongoCollection = mongoConnParam[["collection"]],
-                                               mongoQuery = mongoConnParam[["query"]],
-                                               mongoFields = mongoConnParam[["fields"]],
-                                               recursiveUnnests = c("event",
-                                                                    "messageData",
-                                                                    "any",
-                                                                    "sensorDetection"))
+    mongoConn <- mongolite::mongo(url = mongoConnParam$mongoUri,
+                                  db = mongoConnParam$mongoDb,
+                                  collection = mongoConnParam$collection)
     
-  } # close Extract
+    numRecs <- mongoConn$count(query = mongoConnParam$query)
+    
+    it <- mongoConn$iterate(query = mongoConnParam$query,
+                            fields = mongoConnParam$fields)
+    
+    pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                             host = pgConnParam$pgHost,
+                             port = pgConnParam$pgPort,
+                             user = pgConnParam$pgUser,
+                             password = pgConnParam$pgPass,
+                             dbname = pgConnParam$pgDb)
+    
+    rdx <- 1
+    
+    while(!is.null(x <- it$one())){
+    #Testing
+    #for(idx in 1:1000){ 
+      
+      message(paste0("Acq Row: ",as.character(rdx),
+                     "  % comp: ",round(x = rdx/numRecs,
+                                        digits = 3)*100))
+      
+      x <- it$one()
+      
+      temp <- tibble::tibble("sensorAcqState_pkid" = NA,
+                             "id" = x$`_id`,
+                             "runId" = x$runId,
+                             "runTime" = x$runTime,
+                             "designPoint" = x$designPoint,
+                             "iteration" = x$iteration,
+                             "time_ms" = x$time,
+                             "time_s" = x$time/1000,
+                             "receiverId" = x$event$receiverId,
+                             "senderId" = x$event$senderId,
+                             "sensorId" = x$event$messageData$any$sensorDetection$sensorId,
+                             "entityId" = x$event$messageData$any$sensorDetection$entityId,
+                             "targetId" = x$event$messageData$any$sensorDetection$targetId,
+                             "detectionLevel" = x$event$messageData$any$sensorDetection$detectionLevel,
+                             "previousDetectionLevel" = x$event$messageData$any$sensorDetection$previousDetectionLevel,
+                             "timeToDetection" = x$event$messageData$any$sensorDetection$timeToDetection) 
+      
+      temp_query <- fillTableQuery(data = temp,tableName = "\"sensorAcqState\"",serial = "DEFAULT")
+      
+      DBI::dbSendQuery(conn = pgConn,
+                       statement = temp_query)
+      
+      rdx <- rdx + 1
+      
+    }
+    
+    DBI::dbDisconnect(conn = pgConn)
+    mongoConn$disconnect()
+    
+  } # close Iterate
   
-  { # Transform and Load ----
-    
-    message("Transforming and loading sensorAcqState Data!")
-    
-    sensorAcqData <- sensorAcqData %>%
-      dplyr::rename("id" = "_id",
-                    "time_ms" = "time") %>%
-      dplyr::mutate(time_s = time_ms/1000,
-                    sensorAcqState_pkId = NA)
-    
-    batch_fillAndWrite(data = sensorAcqData,
-                       pgConnParam = pgConnParam,
-                       tableName = "sensorAcqState",
-                       batchSize = batchSize,
-                       database = "PostgreSQL")
-    
-  } # close Transform and Load
+  # { # Extract ----
+  #   
+  #   message("Extracting data from the MongoDB")
+  #   
+  #   sensorAcqData <- modSim::sensorAcquisition(mongoUri = mongoConnParam[["mongoUri"]],
+  #                                              mongoDb = mongoConnParam[["mongoDb"]],
+  #                                              mongoCollection = mongoConnParam[["collection"]],
+  #                                              mongoQuery = mongoConnParam[["query"]],
+  #                                              mongoFields = mongoConnParam[["fields"]],
+  #                                              recursiveUnnests = c("event",
+  #                                                                   "messageData",
+  #                                                                   "any",
+  #                                                                   "sensorDetection"))
+  #   
+  # } # close Extract
+  # 
+  # { # Transform and Load ----
+  #   
+  #   message("Transforming and loading sensorAcqState Data!")
+  #   
+  #   sensorAcqData <- sensorAcqData %>%
+  #     dplyr::rename("id" = "_id",
+  #                   "time_ms" = "time") %>%
+  #     dplyr::mutate(time_s = time_ms/1000,
+  #                   sensorAcqState_pkId = NA)
+  #   
+  #   batch_fillAndWrite(data = sensorAcqData,
+  #                      pgConnParam = pgConnParam,
+  #                      tableName = "sensorAcqState",
+  #                      batchSize = batchSize,
+  #                      database = "PostgreSQL")
+  #   
+  # } # close Transform and Load
+  
+  message("Sensor Acq ETL Complete")
   
 } # close fct_low_etlSensorAcq
 
@@ -578,6 +703,8 @@ queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint,batchSize
     
   } # close Refresh the materialized Views section
   
+  return("Complete!")
+  
 } # close fct_high_queryMongoAndFillPg
 
 ```   
@@ -588,19 +715,21 @@ This is how this function would be executed:
 
 #> These source files read in the mongoURI and mongoDb elements and the PostgreSQL connection objects.
 
-source("./connectionObjects/pgConnectionObj.R")
-source("./connectionObjects/mongoConnectionObj.R")
+source("../connectionObjects/pgConnectionObj.R")
+source("../connectionObjects/mongoConnectionObj.R")
 
 #> Add to the pgConnParam the database name 
 
-pgConnParam[["pgDb"]] <- "modSim4"
+pgConnParam[["pgDb"]] <- "modSimIt4"
 
 #> Execute the function  
 
-fct_high_queryMongoAndFillPg(mongoConnParam = mongoConnParam,
-                             pgConnParam = pgConnParam,
-                             designPoint = "NeilsTestScenario")
+response <- queryMongoAndFillPg(mongoConnParam = mongoConnParam,
+                    pgConnParam = pgConnParam,
+                    designPoint = designPoint)
 
+
+getwd()
 ```
 
 

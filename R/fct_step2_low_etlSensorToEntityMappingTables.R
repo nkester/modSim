@@ -48,18 +48,17 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoin
 
       message("Extracting data from MongoDB")
 
-      entitySensorMapping <- modSim::mapSensorsAndEntities(mongoUri = mongoConnParam[["mongoUri"]],
+      # entitySensorMapping <- modSim::mapSensorsAndEntities(mongoUri = mongoConnParam[["mongoUri"]],
+      #                                                      mongoDb = mongoConnParam[["mongoDb"]],
+      #                                                      mongoCollection = mongoConnParam[["collection"]],
+      #                                                      mongoFields = mongoConnParam[["fields"]],
+      #                                                      mongoQuery = mongoConnParam[["query"]])
+
+      entitySensorMapping <- mapSensorsAndEntities(mongoUri = mongoConnParam[["mongoUri"]],
                                                            mongoDb = mongoConnParam[["mongoDb"]],
-                                                           mongoCollection = mongoConnParam[["collection"]],
-                                                           mongoFields = mongoConnParam[["fields"]],
-                                                           mongoQuery = mongoConnParam[["query"]])
+                                                           mongoCollection = mongoConnParam[["collection"]])
 
-      metaData <- entitySensorMapping$UnnestedSensorState %>%
-        dplyr::distinct(.data = .,
-                        runId,
-                        designPoint,
-                        iteration)
-
+      metaData <- entitySensorMapping$metaData
     } # close Query MongoDb and unnest information about sensors and entities section
 
   } # close Extract section
@@ -132,20 +131,20 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoin
 
     { # unnestedSensorState ----
 
-      message("Transforming and loading unnestedSensorState data.")
-
-      #> This is the full set of un-nested data from the original query. While not truly "raw", this could be considered the original data set.
-
-      entitySensorMapping$UnnestedSensorState <- entitySensorMapping$UnnestedSensorState %>%
-        dplyr::rename(.data = .,
-                      "id" = "_id",
-                      "time_ms" = "time")
-
-      batch_fillAndWrite(data = entitySensorMapping$UnnestedSensorState,
-                         pgConnParam = pgConnParam,
-                         tableName = "unnestedSensorState",
-                         batchSize = batchSize,
-                         database = "PostgreSQL")
+      # message("Transforming and loading unnestedSensorState data.")
+      #
+      # #> This is the full set of un-nested data from the original query. While not truly "raw", this could be considered the original data set.
+      #
+      # entitySensorMapping$UnnestedSensorState <- entitySensorMapping$UnnestedSensorState %>%
+      #   dplyr::rename(.data = .,
+      #                 "id" = "_id",
+      #                 "time_ms" = "time")
+      #
+      # batch_fillAndWrite(data = entitySensorMapping$UnnestedSensorState,
+      #                    pgConnParam = pgConnParam,
+      #                    tableName = "unnestedSensorState",
+      #                    batchSize = batchSize,
+      #                    database = "PostgreSQL")
 
     } # close unnestedSensorState section
 

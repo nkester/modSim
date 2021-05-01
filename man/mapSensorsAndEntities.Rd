@@ -4,13 +4,7 @@
 \alias{mapSensorsAndEntities}
 \title{Map Sensors and Entities}
 \usage{
-mapSensorsAndEntities(
-  mongoUri,
-  mongoDb,
-  mongoCollection,
-  mongoFields,
-  mongoQuery
-)
+mapSensorsAndEntities(mongoUri, mongoDb, mongoCollection)
 }
 \arguments{
 \item{mongoUri}{This is a double quoted character string of the connection
@@ -22,13 +16,13 @@ containing the required files.}
 \item{mongoCollection}{This is a double quoted character string of the mongo
 collection within the named database containing the required information.}
 
-\item{mongoFields}{This is a double quoted json object of collection fields
-that should be returned (annoted with `true`) and those that should not be
-returned (annoted with `false`).}
-
 \item{mongoQuery}{This is a double quoted character string containing the json
 query to pass to the MongoDB. Note that users should escape nested double
 quotes with the \ escape character.}
+
+\item{mongoFields}{This is a double quoted json object of collection fields
+that should be returned (annoted with `true`) and those that should not be
+returned (annoted with `false`).}
 }
 \value{
 This function returns a four element named list of tibbles that

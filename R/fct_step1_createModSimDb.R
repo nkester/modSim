@@ -70,14 +70,7 @@ createModSimDb <- function(connParamList){
                    \"time_s\" TEXT,
                    \"sensorId\" TEXT,
                    \"targetId\" TEXT,
-                   \"changeNumber\" TEXT,
-                   \"hasLOS\" BOOLEAN,
-                   \"hasLOSUpdateTime\" TEXT,
-                   \"characteristicDimension\" TEXT,
-                   \"characteristicDimensionUpdateTime\" TEXT,
-                   \"background\" TEXT,
-                   \"backgroundUpdateTime\" TEXT,
-                   \"nextUpdateTime\" TEXT)"
+                   \"hasLOS\" BOOLEAN)"
 
     createSensorAcq <- "CREATE TABLE IF NOT EXISTS \"sensorAcqState\" (
                    \"sensorAcqState_pkId\" SERIAL PRIMARY KEY,
@@ -107,7 +100,7 @@ createModSimDb <- function(connParamList){
       #> Refresh with: "REFRESH MATERIALIZED VIEW CONCURRENTLY los_sensor_target_pairs_materialized"
 
       query_createLosMatView <- "
-                CREATE MATERIALIZED VIEW los_sensor_target_pairs_materialized AS
+                CREATE MATERIALIZED VIEW IF NOT EXISTS los_sensor_target_pairs_materialized AS
                 SELECT
                   los.\"time_s\",
                   ent2.\"shortName\" AS \"sensorShortName\",
@@ -137,7 +130,7 @@ createModSimDb <- function(connParamList){
       #> Refresh with: "REFRESH MATERIALIZED VIEW CONCURRENTLY acq_sensor_target_pairs_materialized"
 
       query_createAcqMatView <- "
-                      CREATE MATERIALIZED VIEW acq_sensor_target_pairs_materialized AS
+                      CREATE MATERIALIZED VIEW IF NOT EXISTS acq_sensor_target_pairs_materialized AS
                       SELECT
                         acq.\"time_s\",
                         ent2.\"shortName\" AS \"sensorShortName\",
