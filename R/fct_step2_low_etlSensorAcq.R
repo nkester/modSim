@@ -1,12 +1,13 @@
 #' ETL Sensor Acquisition Data
 #'
-#' This function queries the simulation's MongoDB C2SimulationMessage collection,
-#'   transforms and unnestes it, and finally writes it to the PostgreSQL tables
-#'   created by the `createModSimDb` function.
+#' This function queries the C2SimulationMessage collection in the simulation
+#'  MongoDB, extracts the required fields, and then writes it to the PostgreSQL
+#'  tables created by the `creatModSimDb` function. This operates as an iterator
+#'  with MongoDB so it executes one record at a time.
 #'
 #' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
-#' @param mongoConnParamThis is a two element named list including the "mongoUri"
+#' @param mongoConnParam This is a two element named list including the "mongoUri"
 #'   which includes the user name and password and a single character string and
 #'   the "mongoDb" name as a character string.
 #' @param pgConnParam A five element named list containing the following elements:
@@ -15,16 +16,17 @@
 #'   would like to extract from the MongoDB and place into the PostgreSQL database.
 #'   If multiple designPoints are required then execute this function multiple
 #'   times. Note that this pulls ALL iterations executed for that designPoint.
-#' @param batchSize A numeric integer representing how many records you want to
-#'  write to the PostgreSQL database at a time.
 #'
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
 #'
-#' @importFrom dplyr rename mutate
-etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
-
-  requireNamespace(package = "magrittr")
+#' @importFrom mongolite mongo
+#' @importFrom RPostgreSQL PostgreSQL
+#' @importFrom DBI dbConnect dbSendQuery dbDisconnect
+#' @importFrom tibble tibble
+#'
+#' @note Location: ./R/fct_step2_low_etlSensorAcq.R
+etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint){
 
   { # Complete the MongoDB Connection Parameters ----
 
@@ -41,15 +43,19 @@ etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
 
     message("Beginning Iteration")
 
+    #> Connect to the MongoDB
     mongoConn <- mongolite::mongo(url = mongoConnParam$mongoUri,
                                   db = mongoConnParam$mongoDb,
                                   collection = mongoConnParam$collection)
 
+    #> Return the number of records present in the query (for status)
     numRecs <- mongoConn$count(query = mongoConnParam$query)
 
+    #> Create an iterator (cursor) in the MongoDB
     it <- mongoConn$iterate(query = mongoConnParam$query,
                             fields = mongoConnParam$fields)
 
+    #> Connect to the PostgreSQL Database
     pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
                              host = pgConnParam$pgHost,
                              port = pgConnParam$pgPort,
@@ -59,13 +65,16 @@ etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
 
     rdx <- 1
 
+    #> The iterator returns `null` when it reaches the last record.
     while(!is.null(x <- it$one())){
-      #Testing
-      #for(idx in 1:1000){
 
-      message(paste0("Acq Row: ",as.character(rdx),
-                     "  % comp: ",round(x = rdx/numRecs,
-                                        digits = 3)*100))
+      message(paste0("Acq Row: ",
+                     as.character(rdx),
+                     "  is ",
+                     round(x = rdx/numRecs,
+                           digits = 3)*100,
+                     "% complete!")
+      )
 
       x <- it$one()
 
@@ -86,7 +95,9 @@ etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
                              "previousDetectionLevel" = x$event$messageData$any$sensorDetection$previousDetectionLevel,
                              "timeToDetection" = x$event$messageData$any$sensorDetection$timeToDetection)
 
-      temp_query <- fillTableQuery(data = temp,tableName = "\"sensorAcqState\"",serial = "DEFAULT")
+      temp_query <- fillTableQuery(data = temp,
+                                   tableName = "\"sensorAcqState\"",
+                                   serial = "DEFAULT")
 
       DBI::dbSendQuery(conn = pgConn,
                        statement = temp_query)
@@ -99,40 +110,6 @@ etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
     mongoConn$disconnect()
 
   } # close Iterate
-
-  # { # Extract ----
-  #
-  #   message("Extracting data from the MongoDB")
-  #
-  #   sensorAcqData <- modSim::sensorAcquisition(mongoUri = mongoConnParam[["mongoUri"]],
-  #                                              mongoDb = mongoConnParam[["mongoDb"]],
-  #                                              mongoCollection = mongoConnParam[["collection"]],
-  #                                              mongoQuery = mongoConnParam[["query"]],
-  #                                              mongoFields = mongoConnParam[["fields"]],
-  #                                              recursiveUnnests = c("event",
-  #                                                                   "messageData",
-  #                                                                   "any",
-  #                                                                   "sensorDetection"))
-  #
-  # } # close Extract
-  #
-  # { # Transform and Load ----
-  #
-  #   message("Transforming and loading sensorAcqState Data!")
-  #
-  #   sensorAcqData <- sensorAcqData %>%
-  #     dplyr::rename("id" = "_id",
-  #                   "time_ms" = "time") %>%
-  #     dplyr::mutate(time_s = time_ms/1000,
-  #                   sensorAcqState_pkId = NA)
-  #
-  #   batch_fillAndWrite(data = sensorAcqData,
-  #                      pgConnParam = pgConnParam,
-  #                      tableName = "sensorAcqState",
-  #                      batchSize = batchSize,
-  #                      database = "PostgreSQL")
-  #
-  # } # close Transform and Load
 
   message("Sensor Acq ETL Complete")
 
