@@ -16,7 +16,12 @@
 #'  and the ACQ Materialized View queries.
 #'
 #' @importFrom DBI dbConnect dbGetQuery dbDisconnect
-queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
+#'
+#' @note Location: ./R/fct_step3_low_queryData.R
+queryData <- function(pgConnParam,
+                      sensorForce,
+                      targetForce,
+                      designPoint){
 
   pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
                            host = pgConnParam[["pgHost"]],
@@ -42,8 +47,6 @@ queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
                                   sensorForce,
                                   targetForce,
                                   designPoint)
-
-  #GROUP BY \"time_s\", \"sensorShortName\",\"iteration\",\"hasLOS\",\"designPoint\"
 
   losMatViewData <- DBI::dbGetQuery(conn = pgConn,
                                     statement = query_losMatViewData)

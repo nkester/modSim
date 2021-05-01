@@ -1,17 +1,28 @@
 ---
-title: "scratch"
+title: "Step 3: Query, Plot, and Analyze Simulation Data from PostgreSQL"
 author: "Neil Kester"
 date: "4/28/2021"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
 ```
 
+# Purpose  
 
+This step interacts with the data only through the two materialized views created in PostgreSQL. They are named: `los_sensor_target_pairs_materialized` for the line of sight (LOS) data and `acq_sensor_target_pairs_materialized` for the sensor acquisition data.  
 
-```{r}
+# Low Functions  
+
+## Query Data: `queryData()`  
+
+This function is used to pull in data from both materialized views based on the same common filter parameters.  
+
+Specifically, this is used to produce a list of two tibbles with data pertaining to a target force (`BLUE FORCE`or `REDFORCE`), a sensor force (`BLUE FORCE` or `REDFORCE`), and a design point. If multiple design points ore force combinations are required, execute the function multiple times and combine the results.  
+
+```{r low_queryData}
 
 #' Query ModSim Materialized Views
 #' 
@@ -30,8 +41,13 @@ knitr::opts_chunk$set(echo = TRUE)
 #' @return This returns a named list of two elements, the results from the LOS
 #'  and the ACQ Materialized View queries.
 #'  
-#' @importFrom DBI dbConnect dbGetQuery dbDisconnect
-queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
+#' @importFrom DBI dbConnect dbGetQuery dbDisconnect  
+#'
+#' @note Location: ./R/fct_step3_low_queryData.R
+queryData <- function(pgConnParam,
+                      sensorForce,
+                      targetForce,
+                      designPoint){
   
   pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
                            host = pgConnParam[["pgHost"]],
@@ -45,20 +61,18 @@ queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
       FROM los_sensor_target_pairs_materialized
       WHERE \"sensorForce\" = '%s' AND \"targetForce\" = '%s' AND \"designPoint\" = '%s'
       ",
-                                  sensorForce,
-                                  targetForce,
-                                  designPoint)
+      sensorForce,
+      targetForce,
+      designPoint)
   
   query_acqMatViewData <- sprintf("
       SELECT \"time_s\", \"sensorShortName\", \"iteration\", \"designPoint\", \"hasAcq\",\"targetShortName\"
       FROM acq_sensor_target_pairs_materialized
       WHERE \"sensorForce\" = '%s' AND \"targetForce\" = '%s' AND \"designPoint\" = '%s'
       ",
-                                  sensorForce,
-                                  targetForce,
-                                  designPoint)
-  
-  #GROUP BY \"time_s\", \"sensorShortName\",\"iteration\",\"hasLOS\",\"designPoint\"
+      sensorForce,
+      targetForce,
+      designPoint)
   
   losMatViewData <- DBI::dbGetQuery(conn = pgConn,
                                     statement = query_losMatViewData)
@@ -95,9 +109,9 @@ queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
 #'  select n left_join
 #' @importFrom tidyr unnest fill replace_na
 graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
-
+  
   { # LOS Data Prep
-
+    
     los <- losMatViewData %>%
       dplyr::mutate(time_s = as.numeric(time_s)) %>%
       dplyr::mutate(time_s = round(x = time_s,digits = 0)) %>%
@@ -111,7 +125,7 @@ graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
                        .groups = "keep") %>%
       dplyr::ungroup() %>%
       dplyr::select(-sensorShortName)
-
+    
     los2 <- losMatViewData %>%
       dplyr::group_by(designPoint,
                       iteration) %>%
@@ -138,7 +152,7 @@ graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
       tidyr::replace_na(list(count = 0)) %>%
       dplyr::mutate(sensorShortName = sensor,
                     type = "LOS")
-
+    
     los3 <- los2 %>%
       dplyr::group_by(time_s,designPoint,sensorShortName) %>%
       dplyr::summarise(count_mean = mean(count),
@@ -147,11 +161,11 @@ graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
                        count_se = count_sd/sqrt(dplyr::n()),
                        type = "LOS",
                        .groups = "keep")
-
+    
   } # close LOS Data Prep
-
+  
   { # ACQ Data Prep
-
+    
     acq <- acqMatViewData %>%
       dplyr::mutate(time_s = as.numeric(time_s)) %>%
       dplyr::mutate(time_s = round(x = time_s,
@@ -166,7 +180,7 @@ graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
                        .groups = "keep") %>%
       dplyr::ungroup() %>%
       dplyr::select(-sensorShortName)
-
+    
     acq2 <- acqMatViewData %>%
       dplyr::group_by(designPoint,iteration) %>%
       dplyr::mutate(time_s = as.numeric(x = time_s)) %>%
@@ -192,7 +206,7 @@ graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
       tidyr::replace_na(list(count = 0)) %>%
       dplyr::mutate(sensorShortName = sensor,
                     type = "ACQ")
-
+    
     acq3 <- acq2 %>%
       dplyr::group_by(time_s,designPoint,sensorShortName) %>%
       dplyr::summarise(count_mean = mean(count),
@@ -201,9 +215,9 @@ graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
                        count_se = count_sd/sqrt(dplyr::n()),
                        type = "ACQ",
                        .groups = "keep")
-
+    
   } # close ACQ Data Prep
-
+  
   return(list("LOSbyIteration" = los2,
               "LOSmeanByDesignPoint" = los3,
               "ACQbyIteration" = acq2,
@@ -335,10 +349,10 @@ acqColor <- "black"
 ```{r}
 
 graphData <- high_multiDesingPointAndSensorDataPrep(pgConnParam = pgConnParam,
-                                       sensorForce = sensorForce,
-                                       targetForce = targetForce,
-                                       designPoints = designPoints,
-                                       sensors = sensors)
+                                                    sensorForce = sensorForce,
+                                                    targetForce = targetForce,
+                                                    designPoints = designPoints,
+                                                    sensors = sensors)
 
 ```
 ```{r}
@@ -364,7 +378,7 @@ graphData <- high_multiDesingPointAndSensorDataPrep(pgConnParam = pgConnParam,
 #' @importFrom ggplot2 ggplot geom_point aes scale_color_manual theme_minimal theme
 #'  element_text labs facet_grid geom_errorbar
 high_graphMean <- function(graphData,losColor,acqColor,errorbars=TRUE){
-
+  
   p <- ggplot2::ggplot(data = graphData) +
     ggplot2::geom_point(mapping = ggplot2::aes(x = time_s,
                                                y = count_mean,
@@ -379,20 +393,20 @@ high_graphMean <- function(graphData,losColor,acqColor,errorbars=TRUE){
                   title = "Line of Sight and Positive Sensor Acquisitions Over Time",
                   subtitle = "Error bars show mean +- standard error") +
     ggplot2::facet_grid(sensorShortName ~ designPoint)
-
+  
   if(errorbars){
-
+    
     p <- p +
       ggplot2::geom_errorbar(mapping = ggplot2::aes(x = time_s,
                                                     ymax = count_mean + count_se,
                                                     ymin = count_mean - count_se,
                                                     color = type),
                              alpha = 0.25)
-
+    
   }
-
+  
   return(p)
-
+  
 }
 ```
 
