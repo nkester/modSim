@@ -311,6 +311,56 @@ batch_fillAndWrite &lt;- function(data,
   
 } # batch_fillAndWrite</code></pre>
 </div>
+<div id="send-a-postgresql-query-sendpgfilltablequery" class="section level2">
+<h2>Send a PostgreSQL Query: <code>sendPgFillTableQuery()</code></h2>
+<p>This utility function helps because it makes a connection to a specified PostgreSQL database, sends the provided query, and then disconnects. The re-use of this workflow warrants its encapsulation as a function.</p>
+<pre class="r"><code>#&#39; Connect and Send Query to PostgreSQL
+#&#39;
+#&#39; This is a utility function to help connect to, send, and disconnect from
+#&#39;   a PostgreSQL database.
+#&#39;
+#&#39; @author Neil Kester, \email{nkester1@@jhu.edu}
+#&#39;
+#&#39; @param query This is a character string describing a query to send to PostgreSQL.
+#&#39;   Note that this conducts a `dbSendQuery` so this is not suitable for returning
+#&#39;   data but rather to write data or send CREATE instructions.
+#&#39; @param host A character vector to the desired PostgreSQL instance.
+#&#39; @param port An integer port number the PostreSQL instance listen on. Standard
+#&#39;   is 5432.
+#&#39; @param user A character vector of the user name you will connect as.
+#&#39; @param password A character vector of the user name&#39;s password in plain text.
+#&#39; @param dbname A character vector of the database name to connect to. If an
+#&#39;   empty string is provided it should connect to the admin db.
+#&#39;
+#&#39; @return Nothing
+#&#39;
+#&#39; @export sendPgFillTableQuery
+#&#39;
+#&#39; @importFrom DBI dbConnect dbSendQuery dbDisconnect
+#&#39; @importFrom RPostgreSQL PostgreSQL
+#&#39;
+#&#39; @note Location: ./R/fct_utils_sendPgFillTableQuery.R
+sendPgFillTableQuery &lt;- function(query,
+                                 host,
+                                 port,
+                                 user,
+                                 password,
+                                 dbname){
+
+  pgConn &lt;- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                           host = host,
+                           port = port,
+                           user = user,
+                           password = password,
+                           dbname = dbname)
+
+  DBI::dbSendQuery(conn = pgConn,
+                           statement = query)
+
+  DBI::dbDisconnect(conn = pgConn)
+
+}</code></pre>
+</div>
 </div>
 <div id="low-functions" class="section level1">
 <h1>Low Functions</h1>
