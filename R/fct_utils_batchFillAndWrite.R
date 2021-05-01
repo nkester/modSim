@@ -17,6 +17,8 @@
 #' @param database What type of database is it going into? Options are: PostgreSQL
 #'  or SQLite.
 #'
+#' @export batch_fillAndWrite
+#'
 #' @return Returns nothing
 #'
 #' @note Location: ./R/fct_utils_batchFillAndWrite.R

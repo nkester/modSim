@@ -16,6 +16,10 @@ These functions execute the extract, transform, and load (ETL) steps taking the 
 
 # Utility Function
 
+These functions are used throughout the step and are considered "Utilities" because they augment workflows in a consistent manner.  
+
+## Create a PG Insert Query from a Tibble in batches: `batch_fillAndWrite()`  
+
 This is a function I wrote in 2019 to convert an R tibble into a `SQLite` or `PostgreSQL` `INSERT` query. It is fairly robust. One limitation is the size of the resulting query string. Deal with this using the `batchSize` parameter to break the queries into manageable chunks.  
 
 ```{r batch_fillAndWrite}
@@ -37,6 +41,8 @@ This is a function I wrote in 2019 to convert an R tibble into a `SQLite` or `Po
 #' @param batchSize How many records to execute at a time.
 #' @param database What type of database is it going into? Options are: PostgreSQL
 #'  or SQLite.
+#'
+#' @export batch_fillAndWrite
 #'
 #' @return Returns nothing
 #'
@@ -125,10 +131,63 @@ batch_fillAndWrite <- function(data,
 
 ```
 
+## Send a PostgreSQL Query: `sendPgFillTableQuery()`  
+
+This utility function helps because it makes a connection to a specified PostgreSQL database, sends the provided query, and then disconnects. The re-use of this workflow warrants its encapsulation as a function.  
+
+```{r}
+#' Connect and Send Query to PostgreSQL
+#'
+#' This is a utility function to help connect to, send, and disconnect from
+#'   a PostgreSQL database.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param query This is a character string describing a query to send to PostgreSQL.
+#'   Note that this conducts a `dbSendQuery` so this is not suitable for returning
+#'   data but rather to write data or send CREATE instructions.
+#' @param host A character vector to the desired PostgreSQL instance.
+#' @param port An integer port number the PostreSQL instance listen on. Standard
+#'   is 5432.
+#' @param user A character vector of the user name you will connect as.
+#' @param password A character vector of the user name's password in plain text.
+#' @param dbname A character vector of the database name to connect to. If an
+#'   empty string is provided it should connect to the admin db.
+#'
+#' @return Nothing
+#'
+#' @export sendPgFillTableQuery
+#'
+#' @importFrom DBI dbConnect dbSendQuery dbDisconnect
+#' @importFrom RPostgreSQL PostgreSQL
+#'
+#' @note Location: ./R/fct_utils_sendPgFillTableQuery.R
+sendPgFillTableQuery <- function(query,
+                                 host,
+                                 port,
+                                 user,
+                                 password,
+                                 dbname){
+
+  pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                           host = host,
+                           port = port,
+                           user = user,
+                           password = password,
+                           dbname = dbname)
+
+  DBI::dbSendQuery(conn = pgConn,
+                           statement = query)
+
+  DBI::dbDisconnect(conn = pgConn)
+
+}
+```
+
 
 # Low Functions  
 
-## Map Sensors and Entities: `{mapSensorsAndEntities}`  
+## Map Sensors and Entities: `mapSensorsAndEntities()`  
 
 ```{r fct_low_mapSensorsAndEntities}
 #' Map Sensors and Entities
@@ -155,8 +214,6 @@ batch_fillAndWrite <- function(data,
 #'
 #' @importFrom tibble tibble
 #' @importFrom mongolite mongo
-#'
-#' @export mapSensorsAndEntities
 #'
 #' @note Location: ./R/fct_step2_low_mapSensorsAndEntities.R
 mapSensorsAndEntities <- function(mongoUri,
@@ -221,8 +278,7 @@ mapSensorsAndEntities <- function(mongoUri,
 
 ```
 
-
-## Line of Sight Tables  
+## Line of Sight Tables: `etlLosData()`  
 
 This table describes when a sensor target has Line of Sight (LOS). This does not mean they have acquired each other but rather that their line of sight is not obstructed. 
 
@@ -349,7 +405,7 @@ etlLosData <- function(mongoConnParam,
 
 ```
 
-## Sensor Acquisition State Tables  
+## Sensor Acquisition State Tables: `etlSensorAcq()`  
 
 Unlike the LOS table, this table shows the state of acquisition between each sensor target pair. It also shows the previous acquisition state so we can determine when the acquistion level changes. 
 
@@ -475,27 +531,9 @@ etlSensorAcq <- function(mongoConnParam,
 
 ```
 
-```{r test_fct_low_etlSensorAcq, eval=FALSE}
-
-#> These source files read in the mongoURI and mongoDb elements and the PostgreSQL connection objects.
-
-source("../connectionObjects/pgConnectionObj.R")
-source("../connectionObjects/mongoConnectionObj.R")
-
-#> Add to the pgConnParam the database name 
-
-pgConnParam[["pgDb"]] <- "modSim3"
-
-fct_low_etlSensorAcq(mongoConnParam = mongoConnParam,
-                     pgConnParam = pgConnParam,
-                     designPoint = "NeilsTestScenario")
-getwd()
-```
-
-
 # Mid Function
 
-## Sensor to Entity Mapping  
+## Sensor to Entity Mapping: `etlSensorToEntityMappingTables()`  
 
 Select information from the `AcquireModel.state.sensors` MongoDB collection and write it to the `sensorDescription`, `entityIdToName`, and `sensorToEntityId` PostgreSQL tables.  
 
@@ -633,26 +671,13 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,
 
 ```
 
-```{r test_fct_low_etlSensorToEntityMappingTables,eval = FALSE}
-
-#> These source files read in the mongoURI and mongoDb elements and the PostgreSQL connection objects.
-
-source("./connectionObjects/pgConnectionObj.R")
-source("./connectionObjects/mongoConnectionObj.R")
-
-#> Add to the pgConnParam the database name 
-
-pgConnParam[["pgDb"]] <- "modSim3"
-
-fct_low_etlSensorToEntityMappingTables(mongoConnParam = mongoConnParam,
-                                       pgConnParam = pgConnParam,
-                                       designPoint = "NeilsTestScenario")
-
-```  
-
 # High Function  
 
+## Query MongoDB and Fill PostgreSQL: `queryMongoAndFillPg()`  
+
 This function takes three elements as inputs, `mongoConnParam`, `pgConnParam`, and `designPoint` which are used by each of the low functions. Each low function queries and unpackes different collections from the Simulation MongoDB and stores them in the PostgreSQL Relational Database created in the previous step.  
+
+This is the only function exported from this step in the process.  
 
 ```{r fct_high_queryMongoAndFillPg}
 #' Query MongoDB And Fill PostgreSQL
@@ -738,7 +763,28 @@ queryMongoAndFillPg <- function(mongoConnParam,
 
 ```   
 
-This is how this function would be executed:  
+# Execution
+
+This is how this function would be executed . Note, the following is the structure of the input parameters.  
+
+mongoConnParam:  
+
+```{r,echo=FALSE}
+list("mongoUri" = "monogdb://<username>:<password>@<host.path.to.mongodb>:<port>",
+     "mongoDb" = "databaseName")
+```  
+
+pgConnParam:  
+
+```{r, echo=FALSE}
+list("pgHost" = "<host.path.to.postgreSQL>",
+     "pgPort" = 5432,
+     "pgUser" = "<username>",
+     "pgPass" = "<password>",
+     "pgDb" = "<databaseName>")
+```
+
+Implement the function in this way:  
 
 ```{r, eval=FALSE}
 
@@ -749,7 +795,11 @@ source("../connectionObjects/mongoConnectionObj.R")
 
 #> Add to the pgConnParam the database name 
 
-pgConnParam[["pgDb"]] <- "modSimIt5"
+pgConnParam[["pgDb"]] <- "modSimIt5"  
+
+#> The design point I want to load  
+
+designPoint <- "myDesignPoint"
 
 #> Execute the function  
 
@@ -758,7 +808,6 @@ response <- queryMongoAndFillPg(mongoConnParam = mongoConnParam,
                     designPoint = designPoint)
 
 
-getwd()
 ```
 
 

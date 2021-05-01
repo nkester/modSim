@@ -23,8 +23,6 @@
 #' @importFrom tibble tibble
 #' @importFrom mongolite mongo
 #'
-#' @export mapSensorsAndEntities
-#'
 #' @note Location: ./R/fct_step2_low_mapSensorsAndEntities.R
 mapSensorsAndEntities <- function(mongoUri,
                                   mongoDb,
