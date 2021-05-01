@@ -231,8 +231,9 @@ This table describes when a sensor target has Line of Sight (LOS). This does not
 #' ETL Line of Sight Data
 #'
 #' This function queries the LOSTargetStatus collection in the simulation
-#'  MongoDB, transforms and un-nests it and then writes it to the PostgreSQL
-#'  tables  created by the `creatModSimDb` function.
+#'  MongoDB, extracts the required fields, and then writes it to the PostgreSQL
+#'  tables created by the `creatModSimDb` function. This operates as an iterator
+#'  with MongoDB so it executes one record at a time.
 #'
 #' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
@@ -245,15 +246,17 @@ This table describes when a sensor target has Line of Sight (LOS). This does not
 #'   would like to extract from the MongoDB and place into the PostgreSQL database.
 #'   If multiple designPoints are required then execute this function multiple
 #'   times. Note that this pulls ALL iterations executed for that designPoint.
-#' @param batchSize A numeric integer representing how many records you want to
-#'  write to the PostgreSQL database at a time.
 #'
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
 #'
 #' @importFrom dplyr rename mutate
 #' @importFrom stringr str_replace_all
-etlLosData <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
+#'
+#' @note Location: ./R/fct_step2_low_etlLosData.R
+etlLosData <- function(mongoConnParam,
+                       pgConnParam,
+                       designPoint){
   
   requireNamespace(package = "magrittr")
   
@@ -273,15 +276,19 @@ etlLosData <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
     
     message("Beginning Iteration")
     
+    #> Connect to the MongoDB
     mongoConn <- mongolite::mongo(url = mongoConnParam$mongoUri,
                                   db = mongoConnParam$mongoDb,
                                   collection = mongoConnParam$collection)
     
+    #> Return the number of records present in the query (for status)
     numRecs <- mongoConn$count(query = mongoConnParam$query)
     
+    #> Create an iterator (cursor) in the MongoDB
     it <- mongoConn$iterate(query = mongoConnParam$query,
                             fields = mongoConnParam$fields)
     
+    #> Connect to the PostgreSQL Database
     pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
                              host = pgConnParam$pgHost,
                              port = pgConnParam$pgPort,
@@ -291,13 +298,16 @@ etlLosData <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
     
     rdx <- 1
     
+    #> The iterator returns `null` when it reaches the last record.
     while(!is.null(x <- it$one())){
-    #Testing
-    #for(idx in 1:1000){ 
       
-      message(paste0("LOS Row: ",as.character(rdx),
-                     "  % comp: ",round(x = rdx/numRecs,
-                                        digits = 3)*100))
+      message(paste0("LOS Row: ",
+                     as.character(rdx),
+                     "  is ",
+                     round(x = rdx/numRecs,
+                           digits = 3)*100,
+                     "% complete!")
+      )
       
       x <- it$one()
       
@@ -313,7 +323,9 @@ etlLosData <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
                              "targetId" = x$event$targetId,
                              "hasLOS" = x$event$hasLOS) 
       
-      temp_query <- fillTableQuery(data = temp,tableName = "\"losState\"",serial = "DEFAULT")
+      temp_query <- fillTableQuery(data = temp,
+                                   tableName = "\"losState\"",
+                                   serial = "DEFAULT")
       
       DBI::dbSendQuery(conn = pgConn,
                        statement = temp_query)
@@ -322,41 +334,11 @@ etlLosData <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
       
     }
     
+    #> Disconnect from the databases when the job is complete.
     DBI::dbDisconnect(conn = pgConn)
     mongoConn$disconnect()
     
   } # close Iterate
-  
-  # { # Extract ----
-  #   
-  #   message("Extracting data from the MongoDB")
-  #   
-  #   losData <- mongoUnnest(mongoUri = mongoConnParam[["mongoUri"]],
-  #                          mongoDb = mongoConnParam[["mongoDb"]],
-  #                          mongoCollection = mongoConnParam[["collection"]],
-  #                          mongoFields = mongoConnParam[["fields"]],
-  #                          mongoQuery = mongoConnParam[["query"]],
-  #                          unnestCols = "event")
-  #   
-  # } # close Extract
-  
-  # { # Transform and Load ----
-  #   
-  #   message("Transforming and loading losData")
-  #   
-  #   losData <- losData %>%
-  #     dplyr::rename("id" = "_id",
-  #                   "time_ms" = "time") %>%
-  #     dplyr::mutate(time_s = time_ms/1000,
-  #                   losState_pkId = NA)
-  #   
-  #   batch_fillAndWrite(data = losData,
-  #                      pgConnParam = pgConnParam,
-  #                      tableName = "losState",
-  #                      batchSize = batchSize,
-  #                      database = "PostgreSQL")
-  #   
-  # } # close Transform and Load
   
   message("LOS Complete")
   
