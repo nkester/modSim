@@ -16,12 +16,15 @@ data for. For multiple sensors, execute this function multiple times.}
 }
 \value{
 A four element named list of raw (by iteration) and aggregated (mean)
- data for line of sight and aquisition data.
+ data for line of sight and acquisition data.
 }
 \description{
 This takes the results from `low_queryData` and returns expanded data for each
  time step both at the iteration level and also aggregated to the designPoint
  level.
+}
+\note{
+Location: ./R/fct_step3_low_graphDataPrep.R
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}

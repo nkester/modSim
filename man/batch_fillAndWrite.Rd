@@ -19,7 +19,10 @@ batch_fillAndWrite(
 database of choice.}
 
 \item{tableName}{The table of the PostgreSQL table this data is to be inserted
-into.}
+into. It should include `\\"` around names requiring preservation of case.
+Optionally: It can include the SQL Field name specification to deal with a
+tibble that may not be ordered the same as the SQL Table. This should look
+like: `"\"tableName\" (\"fieldOneName\",\"fieldTwoName\")"`}
 
 \item{batchSize}{How many records to execute at a time.}
 
@@ -32,4 +35,10 @@ Returns nothing
 \description{
 This is a utility function used in modSim to take a set of data, break it up
  into batches and write it to the required PostgreSQL database.
+}
+\note{
+Location: ./R/fct_utils_batchFillAndWrite.R
+}
+\author{
+Neil Kester, \email{nkester1@jhu.edu}
 }

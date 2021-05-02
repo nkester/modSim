@@ -4,9 +4,13 @@
 \alias{etlSensorAcq}
 \title{ETL Sensor Acquisition Data}
 \usage{
-etlSensorAcq(mongoConnParam, pgConnParam, designPoint, batchSize)
+etlSensorAcq(mongoConnParam, pgConnParam, designPoint)
 }
 \arguments{
+\item{mongoConnParam}{This is a two element named list including the "mongoUri"
+which includes the user name and password and a single character string and
+the "mongoDb" name as a character string.}
+
 \item{pgConnParam}{A five element named list containing the following elements:
 "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".}
 
@@ -14,22 +18,19 @@ etlSensorAcq(mongoConnParam, pgConnParam, designPoint, batchSize)
 would like to extract from the MongoDB and place into the PostgreSQL database.
 If multiple designPoints are required then execute this function multiple
 times. Note that this pulls ALL iterations executed for that designPoint.}
-
-\item{batchSize}{A numeric integer representing how many records you want to
-write to the PostgreSQL database at a time.}
-
-\item{mongoConnParamThis}{is a two element named list including the "mongoUri"
-which includes the user name and password and a single character string and
-the "mongoDb" name as a character string.}
 }
 \value{
 This returns messages to the console updating the user on the function's
   status but returns no information.
 }
 \description{
-This function queries the simulation's MongoDB C2SimulationMessage collection,
-  transforms and unnestes it, and finally writes it to the PostgreSQL tables
-  created by the `createModSimDb` function.
+This function queries the C2SimulationMessage collection in the simulation
+ MongoDB, extracts the required fields, and then writes it to the PostgreSQL
+ tables created by the `creatModSimDb` function. This operates as an iterator
+ with MongoDB so it executes one record at a time.
+}
+\note{
+Location: ./R/fct_step2_low_etlSensorAcq.R
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}

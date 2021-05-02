@@ -704,10 +704,10 @@ This is the only function exported from this step in the process.
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
 #'
-#' @export queryMongoAndFillPg
+#' @export Step2_queryMongoAndFillPg
 #'
 #' @note Location: ./R/fct_step2_high_queryMongoAndFillPg.R
-queryMongoAndFillPg <- function(mongoConnParam,
+Step2_queryMongoAndFillPg <- function(mongoConnParam,
                                 pgConnParam,
                                 designPoint,
                                 batchSize=100){
@@ -759,7 +759,7 @@ queryMongoAndFillPg <- function(mongoConnParam,
   
   return("Complete!")
   
-} # close fct_high_queryMongoAndFillPg
+} # close Step2_queryMongoAndFillPg
 
 ```   
 

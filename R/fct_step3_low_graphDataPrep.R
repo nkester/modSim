@@ -19,7 +19,9 @@
 #' @importFrom tidyr unnest fill replace_na
 #'
 #' @note Location: ./R/fct_step3_low_graphDataPrep.R
-graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
+graphDataPrep <- function(losMatViewData,
+                          acqMatViewData,
+                          sensor){
 
   { # LOS Data Prep
 

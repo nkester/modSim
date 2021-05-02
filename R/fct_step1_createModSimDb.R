@@ -13,7 +13,7 @@
 #'
 #' @return This returns messages as the build progresses and then a `NULL` response.
 #'
-#' @export createModSimDb
+#' @export Step1_createModSimDb
 #'
 #' @examples createModSimDb(connParamList = pgConnParam)
 #'
@@ -22,7 +22,7 @@
 #' @importFrom magrittr %>%
 #'
 #' @note Location: ./R/fct_step1_createModSimDb.R
-createModSimDb <- function(connParamList){
+Step1_createModSimDb <- function(connParamList){
 
   { # Write Query Statements
 
@@ -250,4 +250,4 @@ createModSimDb <- function(connParamList){
   message(sprintf("Complete: The %s database exists and all tables have been created!",
                   connParamList[["pgDb"]]))
 
-} # close createModSimDb
+} # close Step1_createModSimDb

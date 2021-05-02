@@ -22,13 +22,13 @@
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
 #'
-#' @export queryMongoAndFillPg
+#' @export Step2_queryMongoAndFillPg
 #'
 #' @note Location: ./R/fct_step2_high_queryMongoAndFillPg.R
-queryMongoAndFillPg <- function(mongoConnParam,
-                                pgConnParam,
-                                designPoint,
-                                batchSize=100){
+Step2_queryMongoAndFillPg <- function(mongoConnParam,
+                                      pgConnParam,
+                                      designPoint,
+                                      batchSize=100){
 
   message("Reading from MongDB Acquire.State.Sensor collection and writing to PostgreSQL sensorDescription, entityIdToName, sensorToEntityId, and unnestedSensorState tables.")
 
@@ -77,4 +77,4 @@ queryMongoAndFillPg <- function(mongoConnParam,
 
   return("Complete!")
 
-} # close fct_high_queryMongoAndFillPg
+} # close Step2_queryMongoAndFillPg

@@ -30,6 +30,9 @@ Nothing
 This is a utility function to help connect to, send, and disconnect from
   a PostgreSQL database.
 }
+\note{
+Location: ./R/fct_utils_sendPgFillTableQuery.R
+}
 \author{
 Neil Kester, \email{nkester1@jhu.edu}
 }
