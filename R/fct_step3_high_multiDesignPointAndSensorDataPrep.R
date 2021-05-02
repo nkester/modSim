@@ -15,13 +15,17 @@
 #'  structure data for.
 #'
 #' @return This returns a two element named list of consolidated data at the iteration
-#'  and designPoint level.
+#'  and designPoint level. DesignPoint level data is aggregated across the iterations
+#'  executed for each designPoint. Metrics calculated for that aggregation include
+#'  the mean, variance, standard deviation, and standard error.
 #'
 #' @export Step3_multiDesingPointAndSensorDataPrep
 #'
 #' @importFrom tibble tibble
 #' @importFrom dplyr bind_rows
 #' @importFrom tidyr drop_na
+#'
+#' @note Location: ./R/fct_step3_high_multiDesignPointAndSensorDataPrep.R
 Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
                                                     sensorForce,
                                                     targetForce,

@@ -94,7 +94,7 @@ queryData <- function(pgConnParam,
 
 
 
-```{r}
+```{r low_graphDataPrep}
 #' Prepare the Queried Data for Analysis
 #'
 #' This takes the results from `low_queryData` and returns expanded data for each
@@ -116,7 +116,9 @@ queryData <- function(pgConnParam,
 #' @importFrom tidyr unnest fill replace_na
 #'
 #' @note Location: ./R/fct_step3_low_graphDataPrep.R
-graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
+graphDataPrep <- function(losMatViewData,
+                          acqMatViewData,
+                          sensor){
   
   { # LOS Data Prep
     
@@ -235,11 +237,19 @@ graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
 
 ```
 
-```{r}
+# Mid Functions
+
+# High Functions
+
+## Prepare Data for Multiple Design Points and Sensors: `Step3_multiDesingPointAndSensorDataPrep()`  
+
+This high level function is used to query and prepare data in the two PostgreSQL Materialized views for analysis and graphing. 
+
+```{r Step3_multiDesingPointAndSensorDataPrep}
 #' Query and Prepare Data for Multiple Design Points and Sensors
 #'
 #' This function executes and integrates the two Step 3 low functions across a
-#'  number of designPoints and sensor entities.
+#'  number of designPoints and sensor entities. 
 #'
 #' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
@@ -253,14 +263,22 @@ graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
 #'  structure data for.
 #'
 #' @return This returns a two element named list of consolidated data at the iteration
-#'  and designPoint level.
+#'  and designPoint level. DesignPoint level data is aggregated across the iterations
+#'  executed for each designPoint. Metrics calculated for that aggregation include
+#'  the mean, variance, standard deviation, and standard error. 
 #'
-#' @export multiDesingPointAndSensorDataPrep
+#' @export Step3_multiDesingPointAndSensorDataPrep
 #'
 #' @importFrom tibble tibble
 #' @importFrom dplyr bind_rows
 #' @importFrom tidyr drop_na
-high_multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targetForce,designPoints,sensors){
+#'
+#' @note Location: ./R/fct_step3_high_multiDesignPointAndSensorDataPrep.R
+Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
+                                                    sensorForce,
+                                                    targetForce,
+                                                    designPoints,
+                                                    sensors){
   
   { # set up
     
@@ -269,6 +287,7 @@ high_multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targe
                                                     iteration=NA,
                                                     count=NA,
                                                     sensorShortName=NA)
+    
     consolidateGraphDataMean <- tibble::tibble(time_s=NA,
                                                designPoint=NA,
                                                sensorShortName=NA,
@@ -281,7 +300,9 @@ high_multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targe
   
   for(designPoint in designPoints){
     
-    message(paste0("\nWorking on ",designPoint, " designPoint.\n"))
+    message(paste0("\nWorking on ",
+                   designPoint, 
+                   " designPoint.\n"))
     
     { # Query
       
@@ -290,11 +311,15 @@ high_multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targe
                                    targetForce = targetForce,
                                    designPoint = designPoint)
       
-    }
+    } # close Query
     
     for(sensor in sensors){
       
-      message(paste0("\nWorking on ",sensor, " sensor in ", designPoint, " designPoint.\n"))
+      message(paste0("\nWorking on ",
+                     sensor, 
+                     " sensor in ", 
+                     designPoint, 
+                     " designPoint.\n"))
       
       temp <- graphDataPrep(losMatViewData = designPointData$losMatViewData,
                             acqMatViewData = designPointData$acqMatViewData,
@@ -323,8 +348,67 @@ high_multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targe
   return(list("byIteration" = consolidateGraphDataIteration,
               "byDesignPoint" = consolidateGraphDataMean))
   
-} # close function
+} # close Step3_multiDesingPointAndSensorDataPrep function
 
+```
+
+## Graph Mean 
+
+```{r}
+#' Graph the Mean Data
+#'
+#' Return a consistent formatted graph of the data.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param graphData This is the mean data resulting from `multiDesignPointAndSensorDataPrep`
+#'  function
+#' @param losColor A color string
+#' @param acqColor A color string
+#' @param errorbars Boolean
+#'
+#' @return A ggplot2 plot
+#'
+#' @export Step3_graphMean
+#'
+#' @importFrom ggplot2 ggplot geom_point aes scale_color_manual theme_minimal theme
+#'  element_text labs facet_grid geom_errorbar
+#'
+#' @note Location: ./R/fct_step3_high_graphMean.R
+Step3_graphMean <- function(graphData,
+                           losColor = "blue",
+                           acqColor = "black",
+                           errorbars=TRUE){
+  
+  p <- ggplot2::ggplot(data = graphData) +
+    ggplot2::geom_point(mapping = ggplot2::aes(x = time_s,
+                                               y = count_mean,
+                                               color = type)) +
+    ggplot2::scale_color_manual(values = c(losColor,
+                                           acqColor),
+                                name = "Type") +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(strip.text.y = ggplot2::element_text(angle = 0)) +
+    ggplot2::labs(x = "time (s)",
+                  y = "Mean Target Count",
+                  title = "Line of Sight and Positive Sensor Acquisitions Over Time",
+                  subtitle = "Error bars show mean +- standard error") +
+    ggplot2::facet_grid(sensorShortName ~ designPoint)
+  
+  if(errorbars){
+    
+    p <- p +
+      ggplot2::geom_errorbar(mapping = ggplot2::aes(x = time_s,
+                                                    ymax = count_mean + count_se,
+                                                    ymin = count_mean - count_se,
+                                                    color = type),
+                             alpha = 0.25)
+    
+  } # close if errorbars
+  
+  return(p)
+  
+} # Step3_graphMean function
 ```
 
 ```{r commonParameters}
@@ -370,54 +454,7 @@ graphData <- high_multiDesingPointAndSensorDataPrep(pgConnParam = pgConnParam,
 
 
 
-```{r}
-#' Graph the Mean Data
-#'
-#' @author Neil Kester, \email{nkester1@@jhu.edu}
-#'
-#' @param graphData This is the mean data resulting from `multiDesignPointAndSensorDataPrep`
-#'  function
-#' @param losColor A color string
-#' @param acqColor A color string
-#' @param errorbars Boolean
-#'
-#' @return A ggplot2 plot
-#' @export graphMean
-#'
-#' @importFrom ggplot2 ggplot geom_point aes scale_color_manual theme_minimal theme
-#'  element_text labs facet_grid geom_errorbar
-high_graphMean <- function(graphData,losColor,acqColor,errorbars=TRUE){
-  
-  p <- ggplot2::ggplot(data = graphData) +
-    ggplot2::geom_point(mapping = ggplot2::aes(x = time_s,
-                                               y = count_mean,
-                                               color = type)) +
-    ggplot2::scale_color_manual(values = c(losColor,
-                                           acqColor),
-                                name = "Type") +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(strip.text.y = ggplot2::element_text(angle = 0)) +
-    ggplot2::labs(x = "time (s)",
-                  y = "Mean Target Count",
-                  title = "Line of Sight and Positive Sensor Acquisitions Over Time",
-                  subtitle = "Error bars show mean +- standard error") +
-    ggplot2::facet_grid(sensorShortName ~ designPoint)
-  
-  if(errorbars){
-    
-    p <- p +
-      ggplot2::geom_errorbar(mapping = ggplot2::aes(x = time_s,
-                                                    ymax = count_mean + count_se,
-                                                    ymin = count_mean - count_se,
-                                                    color = type),
-                             alpha = 0.25)
-    
-  }
-  
-  return(p)
-  
-}
-```
+
 
 
 

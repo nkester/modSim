@@ -1,5 +1,7 @@
 #' Graph the Mean Data
 #'
+#' Return a consistent formatted graph of the data.
+#'
 #' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
 #' @param graphData This is the mean data resulting from `multiDesignPointAndSensorDataPrep`
@@ -10,11 +12,16 @@
 #'
 #' @return A ggplot2 plot
 #'
-#' @export graphMean
+#' @export Step3_graphMean
 #'
 #' @importFrom ggplot2 ggplot geom_point aes scale_color_manual theme_minimal theme
 #'  element_text labs facet_grid geom_errorbar
-graphMean <- function(graphData,losColor,acqColor,errorbars=TRUE){
+#'
+#' @note Location: ./R/fct_step3_high_graphMean.R
+Step3_graphMean <- function(graphData,
+                            losColor = "blue",
+                            acqColor = "black",
+                            errorbars=TRUE){
 
   p <- ggplot2::ggplot(data = graphData) +
     ggplot2::geom_point(mapping = ggplot2::aes(x = time_s,
@@ -40,8 +47,8 @@ graphMean <- function(graphData,losColor,acqColor,errorbars=TRUE){
                                                     color = type),
                              alpha = 0.25)
 
-  }
+  } # close if errorbars
 
   return(p)
 
-}
+} # Step3_graphMean function
