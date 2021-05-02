@@ -12,11 +12,13 @@
 #'  data for. For multiple sensors, execute this function multiple times.
 #'
 #' @return A four element named list of raw (by iteration) and aggregated (mean)
-#'  data for line of sight and aquisition data.
+#'  data for line of sight and acquisition data.
 #'
 #' @importFrom dplyr mutate distinct_all filter group_by summarise ungroup
 #'  select n left_join
 #' @importFrom tidyr unnest fill replace_na
+#'
+#' @note Location: ./R/fct_step3_low_graphDataPrep.R
 graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
 
   { # LOS Data Prep
@@ -131,4 +133,5 @@ graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
               "LOSmeanByDesignPoint" = los3,
               "ACQbyIteration" = acq2,
               "ACQmeanByDesignPoint" = acq3))
-}
+
+} # close graphData Prep function
