@@ -24,6 +24,7 @@
 #' @importFrom mongolite mongo
 #'
 #' @note Location: ./R/fct_step2_low_mapSensorsAndEntities.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 mapSensorsAndEntities <- function(mongoUri,
                                   mongoDb,
                                   mongoCollection,

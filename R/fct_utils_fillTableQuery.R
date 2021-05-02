@@ -10,9 +10,8 @@
 #' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
 #' @param data This is a tibble of any dimension although thought should be given
-#'  to very large datasets. It may be better to break the INSERT query into multiple
+#'  to very large data sets. It may be better to break the INSERT query into multiple
 #'  smaller pushes.
-#'
 #' @param tableName This is the name of the table. Note that some DBMS (namely)
 #'   PostgreSQL does not automatically honor case. It is best to be explicit by
 #'   wrapping all names within \"<name>\". Additionally, you may be explicity by
@@ -20,7 +19,6 @@
 #'   This ensures the columns provided in the `data` parameter go to the proper
 #'   location. Do this like this: tableName = "\"<tableName\" (\"fieldOne\",
 #'   \"fieldTwo\")".
-#'
 #' @param serial Any field in the `data` parameter with `NA` will be treated as
 #'   if it is the auto-incrementing primary key for the table. If using
 #'   PostgreSQL this should be "DEFAULT". If using SQLite it should be "NULL".
@@ -30,14 +28,20 @@
 #'
 #' @export fillTableQuery
 #'
-fillTableQuery <- function(data,tableName,serial = "DEFAULT"){
+#' @note Location: ./R/fct_utils_fillTableQuery.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+fillTableQuery <- function(data,
+                           tableName,
+                           serial = "DEFAULT"){
 
   query<-sprintf("INSERT INTO %s VALUES",
                  tableName)
 
   for(rdx in 1:nrow(data)){
 
-    query <- paste(query,"(",sep = '')
+    query <- paste(query,
+                   "(",
+                   sep = '')
 
     row <- NULL
 
@@ -47,38 +51,58 @@ fillTableQuery <- function(data,tableName,serial = "DEFAULT"){
 
         if(is.na(data[rdx,cdx][[1]])){
 
-          row <- paste(row, serial, sep = '')
+          row <- paste(row,
+                       serial,
+                       sep = '')
 
         }else{
 
-          row <- paste(row,"'",data[rdx,cdx][[1]],"'",sep = '')
+          row <- paste(row,
+                       "'",
+                       data[rdx,cdx][[1]],
+                       "'",
+                       sep = '')
 
-        }
+        } # close else
 
       }else{
 
         if(is.na(data[rdx,cdx][[1]])){
 
-          row <-paste(row,serial,",",sep = '')
+          row <-paste(row,
+                      serial,
+                      ",",
+                      sep = '')
 
         }else{
 
-          row <- paste(row,"'",data[rdx,cdx][[1]],"',",sep = '')
+          row <- paste(row,
+                       "'",
+                       data[rdx,cdx][[1]],
+                       "',",
+                       sep = '')
 
-        }
-      }
+        } # close else
+
+      } # close else
 
     }#close cdx loop
 
-    query <- paste(query,row,sep = '')
+    query <- paste(query,
+                   row,
+                   sep = '')
 
     if(rdx == nrow(data)){
 
-      query <- paste(query,")",sep = '')
+      query <- paste(query,
+                     ")",
+                     sep = '')
 
     }else{#if complete
 
-      query <- paste(query,"),",sep = '')
+      query <- paste(query,
+                     "),",
+                     sep = '')
 
     }#close else
 

@@ -24,6 +24,7 @@
 #' @importFrom RPostgreSQL PostgreSQL
 #'
 #' @note Location: ./R/fct_utils_sendPgFillTableQuery.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 sendPgFillTableQuery <- function(query,
                                  host,
                                  port,
@@ -39,8 +40,8 @@ sendPgFillTableQuery <- function(query,
                            dbname = dbname)
 
   DBI::dbSendQuery(conn = pgConn,
-                           statement = query)
+                   statement = query)
 
   DBI::dbDisconnect(conn = pgConn)
 
-}
+} # close sendPgFillTableQuery function

@@ -38,6 +38,8 @@ This function queries the simulation's MongoDB, extracting specific information
 }
 \note{
 Location: ./R/fct_step2_mid_etlSensorToEntityMappingTables.R
+
+RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}

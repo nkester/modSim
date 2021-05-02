@@ -21,7 +21,8 @@
 #' @importFrom DBI dbConnect dbGetQuery dbSendQuery dbDisconnect
 #' @importFrom magrittr %>%
 #'
-#' @note Location: ./R/fct_step1_createModSimDb.R
+#' @note R script location: ./R/fct_step1_createModSimDb.R
+#' @note RMarkdown location: ./inst/step1_CreatePgDataBase/Step1_configurePostgresDb.Rmd
 Step1_createModSimDb <- function(connParamList){
 
   { # Write Query Statements

@@ -39,6 +39,8 @@ This is the high level function executed in step 2 to extract data from the
 }
 \note{
 Location: ./R/fct_step2_high_queryMongoAndFillPg.R
+
+RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}

@@ -31,6 +31,8 @@ This function queries the LOSTargetStatus collection in the simulation
 }
 \note{
 Location: ./R/fct_step2_low_etlLosData.R
+
+RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}

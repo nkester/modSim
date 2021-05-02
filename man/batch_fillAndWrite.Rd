@@ -38,6 +38,8 @@ This is a utility function used in modSim to take a set of data, break it up
 }
 \note{
 Location: ./R/fct_utils_batchFillAndWrite.R
+
+RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}

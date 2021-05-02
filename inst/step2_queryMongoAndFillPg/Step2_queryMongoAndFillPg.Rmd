@@ -18,9 +18,131 @@ These functions execute the extract, transform, and load (ETL) steps taking the 
 
 These functions are used throughout the step and are considered "Utilities" because they augment workflows in a consistent manner.  
 
-## Create a PG Insert Query from a Tibble in batches: `batch_fillAndWrite()`  
+## Create a PostgreSQL or SQLite INSERT Query Based on a Provided Tibble of Data: `fillTableQuery()`  
 
-This is a function I wrote in 2019 to convert an R tibble into a `SQLite` or `PostgreSQL` `INSERT` query. It is fairly robust. One limitation is the size of the resulting query string. Deal with this using the `batchSize` parameter to break the queries into manageable chunks.  
+This is a function I wrote in 2019 to convert an R tibble into a `SQLite` or `PostgreSQL` `INSERT` query. It is fairly robust. One limitation is the size of the resulting query string. Deal with this by using `batch_fillAndWrite()`.
+
+```{r}
+#' SQL Insert Query Builder
+#'
+#' This function takes a data frame and a table name (optionally including the
+#'   field names in parentheses) and returns a string of a properly built SQL
+#'   INSERT Query. This is most used with SQLite and PostgreSQL. Of note, to
+#'   add the proper entry for auto-incrementing columns, pass an `NA` value for
+#'   that field in the `data` parameter and provide the keyword in the `serial`
+#'   parameter.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param data This is a tibble of any dimension although thought should be given
+#'  to very large data sets. It may be better to break the INSERT query into multiple
+#'  smaller pushes.
+#' @param tableName This is the name of the table. Note that some DBMS (namely)
+#'   PostgreSQL does not automatically honor case. It is best to be explicit by
+#'   wrapping all names within \"<name>\". Additionally, you may be explicity by
+#'   including in this parameter the order of the table's fields you are providing.
+#'   This ensures the columns provided in the `data` parameter go to the proper
+#'   location. Do this like this: tableName = "\"<tableName\" (\"fieldOne\",
+#'   \"fieldTwo\")".
+#' @param serial Any field in the `data` parameter with `NA` will be treated as
+#'   if it is the auto-incrementing primary key for the table. If using
+#'   PostgreSQL this should be "DEFAULT". If using SQLite it should be "NULL".
+#'
+#' @return This returns a character string that can be passed to a DBI::dbSendQuery
+#'   function for execution on the DBMS.
+#'
+#' @export fillTableQuery
+#'
+#' @note Location: ./R/fct_utils_fillTableQuery.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+fillTableQuery <- function(data,
+                           tableName,
+                           serial = "DEFAULT"){
+
+  query<-sprintf("INSERT INTO %s VALUES",
+                 tableName)
+
+  for(rdx in 1:nrow(data)){
+
+    query <- paste(query,
+                   "(",
+                   sep = '')
+
+    row <- NULL
+
+    for(cdx in 1:ncol(data)){
+
+      if(cdx == ncol(data)){
+
+        if(is.na(data[rdx,cdx][[1]])){
+
+          row <- paste(row, 
+                       serial, 
+                       sep = '')
+
+        }else{
+
+          row <- paste(row,
+                       "'",
+                       data[rdx,cdx][[1]],
+                       "'",
+                       sep = '')
+
+        } # close else
+
+      }else{
+
+        if(is.na(data[rdx,cdx][[1]])){
+
+          row <-paste(row,
+                      serial,
+                      ",",
+                      sep = '')
+
+        }else{
+
+          row <- paste(row,
+                       "'",
+                       data[rdx,cdx][[1]],
+                       "',",
+                       sep = '')
+
+        } # close else
+        
+      } # close else
+
+    }#close cdx loop
+
+    query <- paste(query,
+                   row,
+                   sep = '')
+
+    if(rdx == nrow(data)){
+
+      query <- paste(query,
+                     ")",
+                     sep = '')
+
+    }else{#if complete
+
+      query <- paste(query,
+                     "),",
+                     sep = '')
+
+    }#close else
+
+  }#close rdx loop
+
+  return(query)
+
+}#close fillTableQuery function
+
+```
+
+
+## Call the `fillTableQuery()` in batches: `batch_fillAndWrite()`  
+
+Extend `fillTableQuery()` by breaking a large table into batches using the `batchSize` parameter.    
 
 ```{r batch_fillAndWrite}
 #' Utility Batch Fill and Write
@@ -47,6 +169,7 @@ This is a function I wrote in 2019 to convert an R tibble into a `SQLite` or `Po
 #' @return Returns nothing
 #'
 #' @note Location: ./R/fct_utils_batchFillAndWrite.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 batch_fillAndWrite <- function(data,
                                pgConnParam,
                                tableName,
@@ -135,7 +258,7 @@ batch_fillAndWrite <- function(data,
 
 This utility function helps because it makes a connection to a specified PostgreSQL database, sends the provided query, and then disconnects. The re-use of this workflow warrants its encapsulation as a function.  
 
-```{r}
+```{r utils_sendPgFillTableQuery}
 #' Connect and Send Query to PostgreSQL
 #'
 #' This is a utility function to help connect to, send, and disconnect from
@@ -162,6 +285,7 @@ This utility function helps because it makes a connection to a specified Postgre
 #' @importFrom RPostgreSQL PostgreSQL
 #'
 #' @note Location: ./R/fct_utils_sendPgFillTableQuery.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 sendPgFillTableQuery <- function(query,
                                  host,
                                  port,
@@ -181,7 +305,7 @@ sendPgFillTableQuery <- function(query,
 
   DBI::dbDisconnect(conn = pgConn)
 
-}
+} # close sendPgFillTableQuery function
 ```
 
 
@@ -216,6 +340,7 @@ sendPgFillTableQuery <- function(query,
 #' @importFrom mongolite mongo
 #'
 #' @note Location: ./R/fct_step2_low_mapSensorsAndEntities.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 mapSensorsAndEntities <- function(mongoUri,
                                   mongoDb,
                                   mongoCollection,
@@ -312,6 +437,7 @@ This table describes when a sensor target has Line of Sight (LOS). This does not
 #' @importFrom tibble tibble
 #'
 #' @note Location: ./R/fct_step2_low_etlLosData.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 etlLosData <- function(mongoConnParam,
                        pgConnParam,
                        designPoint){
@@ -438,6 +564,7 @@ Unlike the LOS table, this table shows the state of acquisition between each sen
 #' @importFrom tibble tibble
 #'
 #' @note Location: ./R/fct_step2_low_etlSensorAcq.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 etlSensorAcq <- function(mongoConnParam,
                          pgConnParam,
                          designPoint){
@@ -568,6 +695,7 @@ These tables provide maps to the various entity and sensor Ids produced by the s
 #' @importFrom stringr str_detect str_extract
 #'
 #' @note Location: ./R/fct_step2_mid_etlSensorToEntityMappingTables.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 etlSensorToEntityMappingTables <- function(mongoConnParam,
                                            pgConnParam,
                                            designPoint,
@@ -707,6 +835,7 @@ This is the only function exported from this step in the process.
 #' @export Step2_queryMongoAndFillPg
 #'
 #' @note Location: ./R/fct_step2_high_queryMongoAndFillPg.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 Step2_queryMongoAndFillPg <- function(mongoConnParam,
                                 pgConnParam,
                                 designPoint,

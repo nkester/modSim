@@ -22,6 +22,7 @@
 #' @return Returns nothing
 #'
 #' @note Location: ./R/fct_utils_batchFillAndWrite.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 batch_fillAndWrite <- function(data,
                                pgConnParam,
                                tableName,

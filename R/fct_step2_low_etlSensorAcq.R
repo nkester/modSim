@@ -26,6 +26,7 @@
 #' @importFrom tibble tibble
 #'
 #' @note Location: ./R/fct_step2_low_etlSensorAcq.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 etlSensorAcq <- function(mongoConnParam,
                          pgConnParam,
                          designPoint){

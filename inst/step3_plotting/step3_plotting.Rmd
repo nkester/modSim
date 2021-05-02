@@ -44,6 +44,7 @@ Specifically, this is used to produce a list of two tibbles with data pertaining
 #' @importFrom DBI dbConnect dbGetQuery dbDisconnect  
 #'
 #' @note Location: ./R/fct_step3_low_queryData.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 queryData <- function(pgConnParam,
                       sensorForce,
                       targetForce,
@@ -93,7 +94,6 @@ queryData <- function(pgConnParam,
 ## Graph Data Prep: `graphDataPrep()`  
 
 
-
 ```{r low_graphDataPrep}
 #' Prepare the Queried Data for Analysis
 #'
@@ -116,6 +116,7 @@ queryData <- function(pgConnParam,
 #' @importFrom tidyr unnest fill replace_na
 #'
 #' @note Location: ./R/fct_step3_low_graphDataPrep.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 graphDataPrep <- function(losMatViewData,
                           acqMatViewData,
                           sensor){
@@ -274,6 +275,7 @@ This high level function is used to query and prepare data in the two PostgreSQL
 #' @importFrom tidyr drop_na
 #'
 #' @note Location: ./R/fct_step3_high_multiDesignPointAndSensorDataPrep.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
                                                     sensorForce,
                                                     targetForce,
@@ -375,6 +377,7 @@ Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
 #'  element_text labs facet_grid geom_errorbar
 #'
 #' @note Location: ./R/fct_step3_high_graphMean.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 Step3_graphMean <- function(graphData,
                            losColor = "blue",
                            acqColor = "black",

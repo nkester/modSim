@@ -25,6 +25,7 @@
 #' @importFrom stringr str_detect str_extract
 #'
 #' @note Location: ./R/fct_step2_mid_etlSensorToEntityMappingTables.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 etlSensorToEntityMappingTables <- function(mongoConnParam,
                                            pgConnParam,
                                            designPoint,
@@ -124,3 +125,4 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,
   } # close Transform and Load section
 
 } # close fct_step2_mid_etlSensorToEntityMappingTables
+

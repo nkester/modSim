@@ -21,7 +21,9 @@ This function automates the creation of the specific PostgreSQL database used
  is purpose built and not meant to be a general use function.
 }
 \note{
-Location: ./R/fct_step1_createModSimDb.R
+R script location: ./R/fct_step1_createModSimDb.R
+
+RMarkdown location: ./inst/step1_CreatePgDataBase/Step1_configurePostgresDb.Rmd
 }
 \examples{
 createModSimDb(connParamList = pgConnParam)

@@ -2,11 +2,11 @@
 
 export(Step1_createModSimDb)
 export(Step2_queryMongoAndFillPg)
+export(Step3_graphMean)
+export(Step3_multiDesingPointAndSensorDataPrep)
 export(batch_fillAndWrite)
 export(fillTableQuery)
-export(graphMean)
 export(mongoUnnest)
-export(multiDesingPointAndSensorDataPrep)
 export(recursiveUnnests)
 export(sendPgFillTableQuery)
 importFrom(DBI,dbConnect)

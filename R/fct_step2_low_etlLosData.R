@@ -26,6 +26,7 @@
 #' @importFrom tibble tibble
 #'
 #' @note Location: ./R/fct_step2_low_etlLosData.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 etlLosData <- function(mongoConnParam,
                        pgConnParam,
                        designPoint){
@@ -115,3 +116,4 @@ etlLosData <- function(mongoConnParam,
   message("LOS Complete")
 
 } # close fct_low_etlLosData
+

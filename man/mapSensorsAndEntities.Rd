@@ -32,6 +32,8 @@ This function accepts the same inputs as the basic MongoDB connection informatio
 }
 \note{
 Location: ./R/fct_step2_low_mapSensorsAndEntities.R
+
+RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}

@@ -25,6 +25,7 @@
 #' @export Step2_queryMongoAndFillPg
 #'
 #' @note Location: ./R/fct_step2_high_queryMongoAndFillPg.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 Step2_queryMongoAndFillPg <- function(mongoConnParam,
                                       pgConnParam,
                                       designPoint,
