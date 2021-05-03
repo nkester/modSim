@@ -80,16 +80,6 @@ etlSensorAcq <- function(mongoConnParam,
       utils::setTxtProgressBar(pb = pb,
                                value = rdx[[1]])
 
-      # message(paste0("Acq Row: ",
-      #                as.character(rdx),
-      #                "  is ",
-      #                round(x = rdx/numRecs,
-      #                      digits = 3)*100,
-      #                "% complete!")
-      # )
-
-      x <- it$one()
-
       temp <- tibble::tibble("sensorAcqState_pkid" = NA,
                              "id" = x$`_id`,
                              "runId" = x$runId,

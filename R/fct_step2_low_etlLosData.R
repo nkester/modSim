@@ -83,16 +83,6 @@ etlLosData <- function(mongoConnParam,
       utils::setTxtProgressBar(pb = pb,
                                value = rdx[[1]])
 
-      # message(paste0("LOS Row: ",
-      #                as.character(rdx),
-      #                "  is ",
-      #                round(x = rdx/numRecs,
-      #                      digits = 3)*100,
-      #                "% complete!")
-      # )
-
-      x <- it$one()
-
       temp <- tibble::tibble("losState_pkid" = NA,
                              "id" = x$`_id`,
                              "runId" = x$runId,
