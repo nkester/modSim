@@ -516,9 +516,17 @@ etlLosData <- function(mongoConnParam,
                              "targetId" = x$event$targetId,
                              "hasLOS" = x$event$hasLOS) 
       
-      temp_query <- fillTableQuery(data = temp,
+      temp_query <- tryCatch(expr = fillTableQuery(data = temp,
                                    tableName = "\"losState\"",
-                                   serial = "DEFAULT")
+                                   serial = "DEFAULT"),
+                             warning = function(w){
+                               message(w)
+                               return("")
+                             },
+                             error = function(e){
+                               message(e)
+                               return("")
+                             })
       
       DBI::dbSendQuery(conn = pgConn,
                        statement = temp_query)
@@ -659,9 +667,17 @@ etlSensorAcq <- function(mongoConnParam,
                              "previousDetectionLevel" = x$event$messageData$any$sensorDetection$previousDetectionLevel,
                              "timeToDetection" = x$event$messageData$any$sensorDetection$timeToDetection) 
       
-      temp_query <- fillTableQuery(data = temp,
-                                   tableName = "\"sensorAcqState\"",
-                                   serial = "DEFAULT")
+      temp_query <- tryCatch(fillTableQuery(data = temp,
+                                            tableName = "\"sensorAcqState\"",
+                                            serial = "DEFAULT"),
+                             warning = function(w){
+                               message(w)
+                               return("")
+                             },
+                             error = function(e){
+                               message(e)
+                               return("")
+                             })
       
       DBI::dbSendQuery(conn = pgConn,
                        statement = temp_query)
