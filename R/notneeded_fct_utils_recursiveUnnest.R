@@ -23,8 +23,11 @@
 #'
 #' @return This returns a tibble where every row is a sensorID to targetID pair
 #'  and contains the detectionLevel as well as the previousDetectionLevel.
-#' @export sensorAcquisition
-sensorAcquisition<-function(mongoUri,
+#'
+#' @export recursiveUnnests
+#'
+#' @note Location: ./R/fct_utils_recursiveUnnest.R
+recursiveUnnests<-function(mongoUri,
                             mongoDb,
                             mongoCollection,
                             mongoQuery,
@@ -38,6 +41,10 @@ sensorAcquisition<-function(mongoUri,
                                mongoFields = mongoFields)
 
   for(recursiveUnnest in recursiveUnnests){
+
+    message(paste0("Working on unnesting ",
+                   recursiveUnnest,
+                   " column."))
 
     sensorAcqData <- mongoUnnest(mongoData = sensorAcqData,
                                  unnestCols = recursiveUnnest)

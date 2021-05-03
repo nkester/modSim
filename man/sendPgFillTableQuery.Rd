@@ -30,6 +30,11 @@ Nothing
 This is a utility function to help connect to, send, and disconnect from
   a PostgreSQL database.
 }
+\note{
+Location: ./R/fct_utils_sendPgFillTableQuery.R
+
+RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+}
 \author{
 Neil Kester, \email{nkester1@jhu.edu}
 }

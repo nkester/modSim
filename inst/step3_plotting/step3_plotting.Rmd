@@ -1,17 +1,28 @@
 ---
-title: "scratch"
+title: "Step 3: Query, Plot, and Analyze Simulation Data from PostgreSQL"
 author: "Neil Kester"
 date: "4/28/2021"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
 ```
 
+# Purpose  
 
+This step interacts with the data only through the two materialized views created in PostgreSQL. They are named: `los_sensor_target_pairs_materialized` for the line of sight (LOS) data and `acq_sensor_target_pairs_materialized` for the sensor acquisition data.  
 
-```{r}
+# Low Functions  
+
+## Query Data: `queryData()`  
+
+This function is used to pull in data from both materialized views based on the same common filter parameters.  
+
+Specifically, this is used to produce a list of two tibbles with data pertaining to a target force (`BLUE FORCE`or `REDFORCE`), a sensor force (`BLUE FORCE` or `REDFORCE`), and a design point. If multiple design points ore force combinations are required, execute the function multiple times and combine the results.  
+
+```{r low_queryData}
 
 #' Query ModSim Materialized Views
 #' 
@@ -30,8 +41,16 @@ knitr::opts_chunk$set(echo = TRUE)
 #' @return This returns a named list of two elements, the results from the LOS
 #'  and the ACQ Materialized View queries.
 #'  
-#' @importFrom DBI dbConnect dbGetQuery dbDisconnect
-low_queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
+#' @importFrom DBI dbConnect dbGetQuery dbDisconnect  
+#'
+#' @export queryData
+#'
+#' @note Location: ./R/fct_step3_low_queryData.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
+queryData <- function(pgConnParam,
+                      sensorForce,
+                      targetForce,
+                      designPoint){
   
   pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
                            host = pgConnParam[["pgHost"]],
@@ -45,20 +64,18 @@ low_queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
       FROM los_sensor_target_pairs_materialized
       WHERE \"sensorForce\" = '%s' AND \"targetForce\" = '%s' AND \"designPoint\" = '%s'
       ",
-                                  sensorForce,
-                                  targetForce,
-                                  designPoint)
+      sensorForce,
+      targetForce,
+      designPoint)
   
   query_acqMatViewData <- sprintf("
       SELECT \"time_s\", \"sensorShortName\", \"iteration\", \"designPoint\", \"hasAcq\",\"targetShortName\"
       FROM acq_sensor_target_pairs_materialized
       WHERE \"sensorForce\" = '%s' AND \"targetForce\" = '%s' AND \"designPoint\" = '%s'
       ",
-                                  sensorForce,
-                                  targetForce,
-                                  designPoint)
-  
-  #GROUP BY \"time_s\", \"sensorShortName\",\"iteration\",\"hasLOS\",\"designPoint\"
+      sensorForce,
+      targetForce,
+      designPoint)
   
   losMatViewData <- DBI::dbGetQuery(conn = pgConn,
                                     statement = query_losMatViewData)
@@ -74,14 +91,19 @@ low_queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
               "acqMatViewData" = acqMatViewData))
   
 } # close low_queryData
-```
+```  
 
-```{r}
+## Graph Data Prep: `graphDataPrep()`  
+
+
+```{r low_graphDataPrep}
 #' Prepare the Queried Data for Analysis
 #'
 #' This takes the results from `low_queryData` and returns expanded data for each
 #'  time step both at the iteration level and also aggregated to the designPoint
 #'  level.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
 #' @param losMatViewData A tibble resulting from the `low_queryData` function.
 #' @param acqMatViewData A tibble resulting from the `low_queryData` function.
@@ -89,15 +111,22 @@ low_queryData <- function(pgConnParam,sensorForce,targetForce,designPoint){
 #'  data for. For multiple sensors, execute this function multiple times.
 #'
 #' @return A four element named list of raw (by iteration) and aggregated (mean)
-#'  data for line of sight and aquisition data.
+#'  data for line of sight and acquisition data.
 #'
 #' @importFrom dplyr mutate distinct_all filter group_by summarise ungroup
 #'  select n left_join
 #' @importFrom tidyr unnest fill replace_na
-low_graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
-
+#'
+#' @export graphDataPrep
+#'
+#' @note Location: ./R/fct_step3_low_graphDataPrep.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
+graphDataPrep <- function(losMatViewData,
+                          acqMatViewData,
+                          sensor){
+  
   { # LOS Data Prep
-
+    
     los <- losMatViewData %>%
       dplyr::mutate(time_s = as.numeric(time_s)) %>%
       dplyr::mutate(time_s = round(x = time_s,digits = 0)) %>%
@@ -111,7 +140,7 @@ low_graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
                        .groups = "keep") %>%
       dplyr::ungroup() %>%
       dplyr::select(-sensorShortName)
-
+    
     los2 <- losMatViewData %>%
       dplyr::group_by(designPoint,
                       iteration) %>%
@@ -138,7 +167,7 @@ low_graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
       tidyr::replace_na(list(count = 0)) %>%
       dplyr::mutate(sensorShortName = sensor,
                     type = "LOS")
-
+    
     los3 <- los2 %>%
       dplyr::group_by(time_s,designPoint,sensorShortName) %>%
       dplyr::summarise(count_mean = mean(count),
@@ -147,11 +176,11 @@ low_graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
                        count_se = count_sd/sqrt(dplyr::n()),
                        type = "LOS",
                        .groups = "keep")
-
+    
   } # close LOS Data Prep
-
+  
   { # ACQ Data Prep
-
+    
     acq <- acqMatViewData %>%
       dplyr::mutate(time_s = as.numeric(time_s)) %>%
       dplyr::mutate(time_s = round(x = time_s,
@@ -166,7 +195,7 @@ low_graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
                        .groups = "keep") %>%
       dplyr::ungroup() %>%
       dplyr::select(-sensorShortName)
-
+    
     acq2 <- acqMatViewData %>%
       dplyr::group_by(designPoint,iteration) %>%
       dplyr::mutate(time_s = as.numeric(x = time_s)) %>%
@@ -192,7 +221,7 @@ low_graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
       tidyr::replace_na(list(count = 0)) %>%
       dplyr::mutate(sensorShortName = sensor,
                     type = "ACQ")
-
+    
     acq3 <- acq2 %>%
       dplyr::group_by(time_s,designPoint,sensorShortName) %>%
       dplyr::summarise(count_mean = mean(count),
@@ -201,22 +230,31 @@ low_graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
                        count_se = count_sd/sqrt(dplyr::n()),
                        type = "ACQ",
                        .groups = "keep")
-
+    
   } # close ACQ Data Prep
-
+  
   return(list("LOSbyIteration" = los2,
               "LOSmeanByDesignPoint" = los3,
               "ACQbyIteration" = acq2,
               "ACQmeanByDesignPoint" = acq3))
-}
+  
+} # close graphData Prep function
 
 ```
 
-```{r}
+# Mid Functions
+
+# High Functions
+
+## Prepare Data for Multiple Design Points and Sensors: `Step3_multiDesingPointAndSensorDataPrep()`  
+
+This high level function is used to query and prepare data in the two PostgreSQL Materialized views for analysis and graphing. 
+
+```{r Step3_multiDesingPointAndSensorDataPrep}
 #' Query and Prepare Data for Multiple Design Points and Sensors
 #'
 #' This function executes and integrates the two Step 3 low functions across a
-#'  number of designPoints and sensor entities.
+#'  number of designPoints and sensor entities. 
 #'
 #' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
@@ -230,14 +268,23 @@ low_graphDataPrep <- function(losMatViewData,acqMatViewData,sensor){
 #'  structure data for.
 #'
 #' @return This returns a two element named list of consolidated data at the iteration
-#'  and designPoint level.
+#'  and designPoint level. DesignPoint level data is aggregated across the iterations
+#'  executed for each designPoint. Metrics calculated for that aggregation include
+#'  the mean, variance, standard deviation, and standard error. 
 #'
-#' @export multiDesingPointAndSensorDataPrep
+#' @export Step3_multiDesingPointAndSensorDataPrep
 #'
 #' @importFrom tibble tibble
 #' @importFrom dplyr bind_rows
 #' @importFrom tidyr drop_na
-high_multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targetForce,designPoints,sensors){
+#'
+#' @note Location: ./R/fct_step3_high_multiDesignPointAndSensorDataPrep.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
+Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
+                                                    sensorForce,
+                                                    targetForce,
+                                                    designPoint,
+                                                    sensors){
   
   { # set up
     
@@ -246,6 +293,7 @@ high_multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targe
                                                     iteration=NA,
                                                     count=NA,
                                                     sensorShortName=NA)
+    
     consolidateGraphDataMean <- tibble::tibble(time_s=NA,
                                                designPoint=NA,
                                                sensorShortName=NA,
@@ -258,7 +306,9 @@ high_multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targe
   
   for(designPoint in designPoints){
     
-    message(paste0("\nWorking on ",designPoint, " designPoint.\n"))
+    message(paste0("\nWorking on ",
+                   designPoint, 
+                   " designPoint.\n"))
     
     { # Query
       
@@ -267,11 +317,15 @@ high_multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targe
                                    targetForce = targetForce,
                                    designPoint = designPoint)
       
-    }
+    } # close Query
     
     for(sensor in sensors){
       
-      message(paste0("\nWorking on ",sensor, " sensor in ", designPoint, " designPoint.\n"))
+      message(paste0("\nWorking on ",
+                     sensor, 
+                     " sensor in ", 
+                     designPoint, 
+                     " designPoint.\n"))
       
       temp <- graphDataPrep(losMatViewData = designPointData$losMatViewData,
                             acqMatViewData = designPointData$acqMatViewData,
@@ -300,8 +354,68 @@ high_multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targe
   return(list("byIteration" = consolidateGraphDataIteration,
               "byDesignPoint" = consolidateGraphDataMean))
   
-} # close function
+} # close Step3_multiDesingPointAndSensorDataPrep function
 
+```
+
+## Graph Mean 
+
+```{r}
+#' Graph the Mean Data
+#'
+#' Return a consistent formatted graph of the data.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param graphData This is the mean data resulting from `multiDesignPointAndSensorDataPrep`
+#'  function
+#' @param losColor A color string
+#' @param acqColor A color string
+#' @param errorbars Boolean
+#'
+#' @return A ggplot2 plot
+#'
+#' @export Step3_graphMean
+#'
+#' @importFrom ggplot2 ggplot geom_point aes scale_color_manual theme_minimal theme
+#'  element_text labs facet_grid geom_errorbar
+#'
+#' @note Location: ./R/fct_step3_high_graphMean.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
+Step3_graphMean <- function(graphData,
+                           losColor = "blue",
+                           acqColor = "black",
+                           errorbars=TRUE){
+  
+  p <- ggplot2::ggplot(data = graphData) +
+    ggplot2::geom_point(mapping = ggplot2::aes(x = time_s,
+                                               y = count_mean,
+                                               color = type)) +
+    ggplot2::scale_color_manual(values = c(losColor,
+                                           acqColor),
+                                name = "Type") +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(strip.text.y = ggplot2::element_text(angle = 0)) +
+    ggplot2::labs(x = "time (s)",
+                  y = "Mean Target Count",
+                  title = "Line of Sight and Positive Sensor Acquisitions Over Time",
+                  subtitle = "Error bars show mean +- standard error") +
+    ggplot2::facet_grid(sensorShortName ~ designPoint)
+  
+  if(errorbars){
+    
+    p <- p +
+      ggplot2::geom_errorbar(mapping = ggplot2::aes(x = time_s,
+                                                    ymax = count_mean + count_se,
+                                                    ymin = count_mean - count_se,
+                                                    color = type),
+                             alpha = 0.25)
+    
+  } # close if errorbars
+  
+  return(p)
+  
+} # Step3_graphMean function
 ```
 
 ```{r commonParameters}
@@ -316,7 +430,7 @@ source("./connectionObjects/mongoConnectionObj.R")
 pgConnParam[["pgDb"]] <- "modSim"
 
 
-designPoint <- "WASP1_high_high_20210426"
+designPoints <- "WASP1_high_high_20210426"
 designPoint <- "WASP1_low_low_20210426"
 
 designPoints <- c("WASP1_high_high_20210426","WASP1_low_low_20210426")
@@ -335,10 +449,10 @@ acqColor <- "black"
 ```{r}
 
 graphData <- high_multiDesingPointAndSensorDataPrep(pgConnParam = pgConnParam,
-                                       sensorForce = sensorForce,
-                                       targetForce = targetForce,
-                                       designPoints = designPoints,
-                                       sensors = sensors)
+                                                    sensorForce = sensorForce,
+                                                    targetForce = targetForce,
+                                                    designPoints = designPoints,
+                                                    sensors = sensors)
 
 ```
 ```{r}
@@ -347,54 +461,7 @@ graphData <- high_multiDesingPointAndSensorDataPrep(pgConnParam = pgConnParam,
 
 
 
-```{r}
-#' Graph the Mean Data
-#'
-#' @author Neil Kester, \email{nkester1@@jhu.edu}
-#'
-#' @param graphData This is the mean data resulting from `multiDesignPointAndSensorDataPrep`
-#'  function
-#' @param losColor A color string
-#' @param acqColor A color string
-#' @param errorbars Boolean
-#'
-#' @return A ggplot2 plot
-#' @export graphMean
-#'
-#' @importFrom ggplot2 ggplot geom_point aes scale_color_manual theme_minimal theme
-#'  element_text labs facet_grid geom_errorbar
-high_graphMean <- function(graphData,losColor,acqColor,errorbars=TRUE){
 
-  p <- ggplot2::ggplot(data = graphData) +
-    ggplot2::geom_point(mapping = ggplot2::aes(x = time_s,
-                                               y = count_mean,
-                                               color = type)) +
-    ggplot2::scale_color_manual(values = c(losColor,
-                                           acqColor),
-                                name = "Type") +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(strip.text.y = ggplot2::element_text(angle = 0)) +
-    ggplot2::labs(x = "time (s)",
-                  y = "Mean Target Count",
-                  title = "Line of Sight and Positive Sensor Acquisitions Over Time",
-                  subtitle = "Error bars show mean +- standard error") +
-    ggplot2::facet_grid(sensorShortName ~ designPoint)
-
-  if(errorbars){
-
-    p <- p +
-      ggplot2::geom_errorbar(mapping = ggplot2::aes(x = time_s,
-                                                    ymax = count_mean + count_se,
-                                                    ymin = count_mean - count_se,
-                                                    color = type),
-                             alpha = 0.25)
-
-  }
-
-  return(p)
-
-}
-```
 
 
 

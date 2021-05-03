@@ -17,17 +17,20 @@
 #'   empty string is provided it should connect to the admin db.
 #'
 #' @return Nothing
+#'
 #' @export sendPgFillTableQuery
 #'
 #' @importFrom DBI dbConnect dbSendQuery dbDisconnect
 #' @importFrom RPostgreSQL PostgreSQL
+#'
+#' @note Location: ./R/fct_utils_sendPgFillTableQuery.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 sendPgFillTableQuery <- function(query,
                                  host,
                                  port,
                                  user,
                                  password,
                                  dbname){
-
 
   pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
                            host = host,
@@ -37,8 +40,8 @@ sendPgFillTableQuery <- function(query,
                            dbname = dbname)
 
   DBI::dbSendQuery(conn = pgConn,
-                           statement = query)
+                   statement = query)
 
   DBI::dbDisconnect(conn = pgConn)
 
-}
+} # close sendPgFillTableQuery function

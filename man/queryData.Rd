@@ -25,6 +25,11 @@ This returns a named list of two elements, the results from the LOS
 This function queries the materialized views created in Step 1 and filled in
  Step 2.
 }
+\note{
+Location: ./R/fct_step3_low_queryData.R
+
+RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
+}
 \author{
 Neil Kester, \email{nkester1@jhu.edu}
 }

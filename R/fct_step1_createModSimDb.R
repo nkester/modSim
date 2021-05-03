@@ -12,13 +12,18 @@
 #'  "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".
 #'
 #' @return This returns messages as the build progresses and then a `NULL` response.
-#' @export createModSimDb
+#'
+#' @export Step1_createModSimDb
 #'
 #' @examples createModSimDb(connParamList = pgConnParam)
 #'
 #' @importFrom RPostgreSQL PostgreSQL
 #' @importFrom DBI dbConnect dbGetQuery dbSendQuery dbDisconnect
-createModSimDb <- function(connParamList){
+#' @importFrom magrittr %>%
+#'
+#' @note R script location: ./R/fct_step1_createModSimDb.R
+#' @note RMarkdown location: ./inst/step1_CreatePgDataBase/Step1_configurePostgresDb.Rmd
+Step1_createModSimDb <- function(connParamList){
 
   { # Write Query Statements
 
@@ -70,14 +75,7 @@ createModSimDb <- function(connParamList){
                    \"time_s\" TEXT,
                    \"sensorId\" TEXT,
                    \"targetId\" TEXT,
-                   \"changeNumber\" TEXT,
-                   \"hasLOS\" BOOLEAN,
-                   \"hasLOSUpdateTime\" TEXT,
-                   \"characteristicDimension\" TEXT,
-                   \"characteristicDimensionUpdateTime\" TEXT,
-                   \"background\" TEXT,
-                   \"backgroundUpdateTime\" TEXT,
-                   \"nextUpdateTime\" TEXT)"
+                   \"hasLOS\" BOOLEAN)"
 
     createSensorAcq <- "CREATE TABLE IF NOT EXISTS \"sensorAcqState\" (
                    \"sensorAcqState_pkId\" SERIAL PRIMARY KEY,
@@ -107,7 +105,7 @@ createModSimDb <- function(connParamList){
       #> Refresh with: "REFRESH MATERIALIZED VIEW CONCURRENTLY los_sensor_target_pairs_materialized"
 
       query_createLosMatView <- "
-                CREATE MATERIALIZED VIEW los_sensor_target_pairs_materialized AS
+                CREATE MATERIALIZED VIEW IF NOT EXISTS los_sensor_target_pairs_materialized AS
                 SELECT
                   los.\"time_s\",
                   ent2.\"shortName\" AS \"sensorShortName\",
@@ -137,7 +135,7 @@ createModSimDb <- function(connParamList){
       #> Refresh with: "REFRESH MATERIALIZED VIEW CONCURRENTLY acq_sensor_target_pairs_materialized"
 
       query_createAcqMatView <- "
-                      CREATE MATERIALIZED VIEW acq_sensor_target_pairs_materialized AS
+                      CREATE MATERIALIZED VIEW IF NOT EXISTS acq_sensor_target_pairs_materialized AS
                       SELECT
                         acq.\"time_s\",
                         ent2.\"shortName\" AS \"sensorShortName\",
@@ -253,4 +251,4 @@ createModSimDb <- function(connParamList){
   message(sprintf("Complete: The %s database exists and all tables have been created!",
                   connParamList[["pgDb"]]))
 
-} # close createModSimDb
+} # close Step1_createModSimDb

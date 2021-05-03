@@ -16,24 +16,165 @@ These functions execute the extract, transform, and load (ETL) steps taking the 
 
 # Utility Function
 
+These functions are used throughout the step and are considered "Utilities" because they augment workflows in a consistent manner.  
+
+## Create a PostgreSQL or SQLite INSERT Query Based on a Provided Tibble of Data: `fillTableQuery()`  
+
+This is a function I wrote in 2019 to convert an R tibble into a `SQLite` or `PostgreSQL` `INSERT` query. It is fairly robust. One limitation is the size of the resulting query string. Deal with this by using `batch_fillAndWrite()`.
+
+```{r}
+#' SQL Insert Query Builder
+#'
+#' This function takes a data frame and a table name (optionally including the
+#'   field names in parentheses) and returns a string of a properly built SQL
+#'   INSERT Query. This is most used with SQLite and PostgreSQL. Of note, to
+#'   add the proper entry for auto-incrementing columns, pass an `NA` value for
+#'   that field in the `data` parameter and provide the keyword in the `serial`
+#'   parameter.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param data This is a tibble of any dimension although thought should be given
+#'  to very large data sets. It may be better to break the INSERT query into multiple
+#'  smaller pushes.
+#' @param tableName This is the name of the table. Note that some DBMS (namely)
+#'   PostgreSQL does not automatically honor case. It is best to be explicit by
+#'   wrapping all names within \"<name>\". Additionally, you may be explicity by
+#'   including in this parameter the order of the table's fields you are providing.
+#'   This ensures the columns provided in the `data` parameter go to the proper
+#'   location. Do this like this: tableName = "\"<tableName\" (\"fieldOne\",
+#'   \"fieldTwo\")".
+#' @param serial Any field in the `data` parameter with `NA` will be treated as
+#'   if it is the auto-incrementing primary key for the table. If using
+#'   PostgreSQL this should be "DEFAULT". If using SQLite it should be "NULL".
+#'
+#' @return This returns a character string that can be passed to a DBI::dbSendQuery
+#'   function for execution on the DBMS.
+#'
+#' @export fillTableQuery
+#'
+#' @note Location: ./R/fct_utils_fillTableQuery.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+fillTableQuery <- function(data,
+                           tableName,
+                           serial = "DEFAULT"){
+
+  query<-sprintf("INSERT INTO %s VALUES",
+                 tableName)
+
+  for(rdx in 1:nrow(data)){
+
+    query <- paste(query,
+                   "(",
+                   sep = '')
+
+    row <- NULL
+
+    for(cdx in 1:ncol(data)){
+
+      if(cdx == ncol(data)){
+
+        if(is.na(data[rdx,cdx][[1]])){
+
+          row <- paste(row, 
+                       serial, 
+                       sep = '')
+
+        }else{
+
+          row <- paste(row,
+                       "'",
+                       data[rdx,cdx][[1]],
+                       "'",
+                       sep = '')
+
+        } # close else
+
+      }else{
+
+        if(is.na(data[rdx,cdx][[1]])){
+
+          row <-paste(row,
+                      serial,
+                      ",",
+                      sep = '')
+
+        }else{
+
+          row <- paste(row,
+                       "'",
+                       data[rdx,cdx][[1]],
+                       "',",
+                       sep = '')
+
+        } # close else
+        
+      } # close else
+
+    }#close cdx loop
+
+    query <- paste(query,
+                   row,
+                   sep = '')
+
+    if(rdx == nrow(data)){
+
+      query <- paste(query,
+                     ")",
+                     sep = '')
+
+    }else{#if complete
+
+      query <- paste(query,
+                     "),",
+                     sep = '')
+
+    }#close else
+
+  }#close rdx loop
+
+  return(query)
+
+}#close fillTableQuery function
+
+```
+
+
+## Call the `fillTableQuery()` in batches: `batch_fillAndWrite()`  
+
+Extend `fillTableQuery()` by breaking a large table into batches using the `batchSize` parameter.    
+
 ```{r batch_fillAndWrite}
 #' Utility Batch Fill and Write
 #'
 #' This is a utility function used in modSim to take a set of data, break it up
 #'  into batches and write it to the required PostgreSQL database.
 #'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
 #' @param data A tibble of data
 #' @param pgConnParam The connection strings required to connect to the PostgreSQL
 #'  database of choice.
 #' @param tableName The table of the PostgreSQL table this data is to be inserted
-#'  into.
+#'  into. It should include `\\"` around names requiring preservation of case.
+#'  Optionally: It can include the SQL Field name specification to deal with a
+#'  tibble that may not be ordered the same as the SQL Table. This should look
+#'  like: `"\"tableName\" (\"fieldOneName\",\"fieldTwoName\")"`
 #' @param batchSize How many records to execute at a time.
 #' @param database What type of database is it going into? Options are: PostgreSQL
 #'  or SQLite.
 #'
+#' @export batch_fillAndWrite
+#'
 #' @return Returns nothing
 #'
-batch_fillAndWrite <- function(data,pgConnParam,tableName,batchSize=100,database = "PostgreSQL"){
+#' @note Location: ./R/fct_utils_batchFillAndWrite.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+batch_fillAndWrite <- function(data,
+                               pgConnParam,
+                               tableName,
+                               batchSize=100,
+                               database = "PostgreSQL"){
   
   if(database == "PostgreSQL"){
     
@@ -109,27 +250,457 @@ batch_fillAndWrite <- function(data,pgConnParam,tableName,batchSize=100,database
   }
   
   
-}
+} # batch_fillAndWrite
 
+```
+
+## Send a PostgreSQL Query: `sendPgFillTableQuery()`  
+
+This utility function helps because it makes a connection to a specified PostgreSQL database, sends the provided query, and then disconnects. The re-use of this workflow warrants its encapsulation as a function.  
+
+```{r utils_sendPgFillTableQuery}
+#' Connect and Send Query to PostgreSQL
+#'
+#' This is a utility function to help connect to, send, and disconnect from
+#'   a PostgreSQL database.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param query This is a character string describing a query to send to PostgreSQL.
+#'   Note that this conducts a `dbSendQuery` so this is not suitable for returning
+#'   data but rather to write data or send CREATE instructions.
+#' @param host A character vector to the desired PostgreSQL instance.
+#' @param port An integer port number the PostreSQL instance listen on. Standard
+#'   is 5432.
+#' @param user A character vector of the user name you will connect as.
+#' @param password A character vector of the user name's password in plain text.
+#' @param dbname A character vector of the database name to connect to. If an
+#'   empty string is provided it should connect to the admin db.
+#'
+#' @return Nothing
+#'
+#' @export sendPgFillTableQuery
+#'
+#' @importFrom DBI dbConnect dbSendQuery dbDisconnect
+#' @importFrom RPostgreSQL PostgreSQL
+#'
+#' @note Location: ./R/fct_utils_sendPgFillTableQuery.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+sendPgFillTableQuery <- function(query,
+                                 host,
+                                 port,
+                                 user,
+                                 password,
+                                 dbname){
+
+  pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                           host = host,
+                           port = port,
+                           user = user,
+                           password = password,
+                           dbname = dbname)
+
+  DBI::dbSendQuery(conn = pgConn,
+                           statement = query)
+
+  DBI::dbDisconnect(conn = pgConn)
+
+} # close sendPgFillTableQuery function
 ```
 
 
 # Low Functions  
 
-## Sensor to Entity Mapping  
+## Map Sensors and Entities: `mapSensorsAndEntities()`  
 
-Select information from the `AcquireModel.state.sensors` MongoDB collection and write it to the `sensorDescription`, `entityIdToName`, `sensorToEntityId`, and `unnestedSensorState` PostgreSQL tables.  
+```{r fct_low_mapSensorsAndEntities}
+#' Map Sensors and Entities
+#'
+#' This function accepts the same inputs as the basic MongoDB connection information
+#'  and submits aggregation pipelines to MongoDB to return information about the
+#'  sensors and entities present in the specified designPoint. 
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param mongoUri This is a double quoted character string of the connection
+#'  object required for the simulation's MongoDB.
+#' @param mongoDb This is a double quoted character string of the database name
+#'  containing the required files.
+#' @param mongoCollection This is a double quoted character string of the mongo
+#'  collection within the named database containing the required information.
+#' @param designPoint This is a single character string with the designPoint you
+#'   would like to extract from the MongoDB and place into the PostgreSQL database.
+#'   If multiple designPoints are required then execute this function multiple
+#'   times. Note that this pulls ALL iterations executed for that designPoint.
+#'
+#' @return This function returns a four element named list of tibbles that
+#'  describe all sensors and entities, their IDs and description.
+#'
+#' @importFrom tibble tibble
+#' @importFrom mongolite mongo
+#'
+#' @note Location: ./R/fct_step2_low_mapSensorsAndEntities.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+mapSensorsAndEntities <- function(mongoUri,
+                                  mongoDb,
+                                  mongoCollection,
+                                  designPoint){
+
+  mongoConnection <- mongolite::mongo(url = mongoUri,
+                                      db = mongoDb,
+                                      collection = mongoCollection)
+
+  { # SENSOR DESCRIPTION ----
+    
+    pipeline_sensorDescription <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"sensorId\": \"$state.sensorId\",\"acquireSensorType\": \"$state.acquireSensorType\",\"magnification\": \"$state.magnification\"}}}]",
+                                          designPoint)
+    
+    sensorDescription <- mongoConnection$aggregate(pipeline = pipeline_sensorDescription)
+    names(sensorDescription) <- "id"
+    sensorDescription <- tibble::tibble(sensorDescription$id)
+
+  } # close SENSOR DESCRIPTION section
+
+  { # ENTITY ID TO NAME ----
+    
+    pipeline_entityIdToName <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"entityId\": \"$state.entityId\",\"source\": \"$state.status.source\"}}}]",
+                                          designPoint)
+    
+    entityIdToName <- mongoConnection$aggregate(pipeline = pipeline_entityIdToName)
+    names(entityIdToName) <- "id"
+    entityIdToName <- tibble::tibble(entityIdToName$id)
+
+  } # close ENTITY ID TO NAME section
+
+  { # SENSOR TO ENTITY ----
+    
+    pipeline_sensorToEntity <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"entityId\": \"$state.entityId\",\"sensorId\": \"$state.sensorId\"}}}]",
+                                          designPoint)
+    
+    sensorToEntity <- mongoConnection$aggregate(pipeline = pipeline_sensorToEntity)
+    names(sensorToEntity) <- "id"
+    sensorToEntity <- tibble::tibble(sensorToEntity$id)
+
+  } # close SENSOR TO ENTITY section
+
+  { # META DATA ----
+    
+    pipeline_metaData <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"runId\": \"$runId\",\"designPoint\": \"$designPoint\",\"iteration\": \"$iteration\"}}}]",
+                                          designPoint)
+    
+    metaData <- mongoConnection$aggregate(pipeline = pipeline_metaData)
+    names(metaData) <- "id"
+    metaData <- tibble::tibble(metaData$id)
+
+  } # close META DATA section
+
+  return(list("SensorDescription" = sensorDescription,
+              "EntityIdToName" = entityIdToName,
+              "SensorToEntityId" = sensorToEntity,
+              "metaData" = metaData))
+
+} # close mapSensorsAndEntities function
+
+```
+
+## Line of Sight Tables: `etlLosData()`  
+
+This table describes when a sensor target has Line of Sight (LOS). This does not mean they have acquired each other but rather that their line of sight is not obstructed. 
+
+```{r fct_low_etlLosData}
+
+#' ETL Line of Sight Data
+#'
+#' This function queries the LOSTargetStatus collection in the simulation
+#'  MongoDB, extracts the required fields, and then writes it to the PostgreSQL
+#'  tables created by the `creatModSimDb` function. This operates as an iterator
+#'  with MongoDB so it executes one record at a time.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param mongoConnParam This is a two element named list including the "mongoUri"
+#'   which includes the user name and password and a single character string and
+#'   the "mongoDb" name as a character string.
+#' @param pgConnParam A five element named list containing the following elements:
+#'  "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".
+#' @param designPoint This is a single character string with the designPoint you
+#'   would like to extract from the MongoDB and place into the PostgreSQL database.
+#'   If multiple designPoints are required then execute this function multiple
+#'   times. Note that this pulls ALL iterations executed for that designPoint.
+#'
+#' @return This returns messages to the console updating the user on the function's
+#'   status but returns no information.
+#'
+#' @importFrom mongolite mongo
+#' @importFrom RPostgreSQL PostgreSQL
+#' @importFrom DBI dbConnect dbSendQuery dbDisconnect
+#' @importFrom tibble tibble
+#' @importFrom utils txtProgressBar setTxtProgressBar
+#'
+#' @note Location: ./R/fct_step2_low_etlLosData.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+etlLosData <- function(mongoConnParam,
+                       pgConnParam,
+                       designPoint){
+  
+  requireNamespace(package = "magrittr")
+  
+  { # Complete the MongoDB Connection Parameters ----
+    
+    mongoConnParam[["collection"]] <- "AcquireModel.event.LOSTargetStatus"
+    
+    mongoConnParam[["query"]] <- sprintf("{\"designPoint\": \"%s\"}",
+                                         designPoint)
+    
+    mongoConnParam[["fields"]] <- "{\"_id\": true, \"runId\": true, \"runTime\": true,
+  \"designPoint\": true, \"iteration\": true, \"time\": true,\"event\": true}"
+    
+  } # close Complete the MongoDB Connection Parameters
+  
+  { # Iterate
+    
+    message("Beginning Iteration")
+    
+    #> Connect to the MongoDB
+    mongoConn <- mongolite::mongo(url = mongoConnParam$mongoUri,
+                                  db = mongoConnParam$mongoDb,
+                                  collection = mongoConnParam$collection)
+    
+    #> Return the number of records present in the query (for status)
+    numRecs <- mongoConn$count(query = mongoConnParam$query)
+    
+    #> Create an iterator (cursor) in the MongoDB
+    it <- mongoConn$iterate(query = mongoConnParam$query,
+                            fields = mongoConnParam$fields)
+    
+    #> Connect to the PostgreSQL Database
+    pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                             host = pgConnParam$pgHost,
+                             port = pgConnParam$pgPort,
+                             user = pgConnParam$pgUser,
+                             password = pgConnParam$pgPass,
+                             dbname = pgConnParam$pgDb)
+    
+    rdx <- list(1)
+    
+    #> Establish a progress bar
+    pb <- utils::txtProgressBar(min = 0,
+                                max = numRecs,
+                                style = 3)
+    
+    #> The iterator returns `null` when it reaches the last record.
+    while(!is.null(x <- it$one())){
+      
+      utils::setTxtProgressBar(pb = pb,
+                               value = rdx[[1]])
+      
+      # message(paste0("LOS Row: ",
+      #                as.character(rdx),
+      #                "  is ",
+      #                round(x = rdx/numRecs,
+      #                      digits = 3)*100,
+      #                "% complete!")
+      # )
+      
+      x <- it$one()
+      
+      temp <- tibble::tibble("losState_pkid" = NA,
+                             "id" = x$`_id`,
+                             "runId" = x$runId,
+                             "runTime" = x$runTime,
+                             "designPoint" = x$designPoint,
+                             "iteration" = x$iteration,
+                             "time_ms" = x$time,
+                             "time_s" = x$time/1000,
+                             "sensorId" = x$event$sensorId,
+                             "targetId" = x$event$targetId,
+                             "hasLOS" = x$event$hasLOS) 
+      
+      temp_query <- fillTableQuery(data = temp,
+                                   tableName = "\"losState\"",
+                                   serial = "DEFAULT")
+      
+      DBI::dbSendQuery(conn = pgConn,
+                       statement = temp_query)
+      
+      rdx[[1]] <- rdx[[1]] + 1
+      
+    } # close While loop for iterator
+    
+    #> Clean up the progress bar object
+    close(pb)
+    rm(pb)
+    
+    #> Disconnect from the databases when the job is complete.
+    DBI::dbDisconnect(conn = pgConn)
+    mongoConn$disconnect()
+    
+  } # close Iterate
+  
+  message("LOS Complete")
+  
+} # close fct_low_etlLosData
+
+
+```
+
+## Sensor Acquisition State Tables: `etlSensorAcq()`  
+
+Unlike the LOS table, this table shows the state of acquisition between each sensor target pair. It also shows the previous acquisition state so we can determine when the acquistion level changes. 
+
+```{r fct_low_etlSensorAcq}
+
+#' ETL Sensor Acquisition Data
+#'
+#' This function queries the C2SimulationMessage collection in the simulation
+#'  MongoDB, extracts the required fields, and then writes it to the PostgreSQL
+#'  tables created by the `creatModSimDb` function. This operates as an iterator
+#'  with MongoDB so it executes one record at a time.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param mongoConnParam This is a two element named list including the "mongoUri"
+#'   which includes the user name and password and a single character string and
+#'   the "mongoDb" name as a character string.
+#' @param pgConnParam A five element named list containing the following elements:
+#'  "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".
+#' @param designPoint This is a single character string with the designPoint you
+#'   would like to extract from the MongoDB and place into the PostgreSQL database.
+#'   If multiple designPoints are required then execute this function multiple
+#'   times. Note that this pulls ALL iterations executed for that designPoint.
+#'
+#' @return This returns messages to the console updating the user on the function's
+#'   status but returns no information.
+#'
+#' @importFrom mongolite mongo
+#' @importFrom RPostgreSQL PostgreSQL
+#' @importFrom DBI dbConnect dbSendQuery dbDisconnect
+#' @importFrom tibble tibble
+#' @importFrom utils txtProgressBar setTxtProgressBar
+#'
+#' @note Location: ./R/fct_step2_low_etlSensorAcq.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+etlSensorAcq <- function(mongoConnParam,
+                         pgConnParam,
+                         designPoint){
+
+  { # Complete the MongoDB Connection Parameters ----
+    
+    mongoConnParam[["collection"]] <- "AcquireModel.event.C2SimulationMessage"
+    
+    mongoConnParam[["query"]] <- sprintf("{\"designPoint\": \"%s\", \"event.messageData.javaClass\": \"sensorproto.SensorModel$DetectedTarget\"}",
+                                         designPoint)
+    
+    mongoConnParam[["fields"]] <- "{\"runId\": 1,\"runTime\": 1, \"designPoint\": 1,\"iteration\": 1, \"time\": 1, \"event.receiverId\": 1, \"event.senderId\": 1,\"event.messageData.any.sensorDetection\": 1}"
+    
+  } # close Complete the MongoDB Connection Parameters
+  
+  { # Iterate
+    
+    message("Beginning Iteration")
+    
+    #> Connect to the MongoDB
+    mongoConn <- mongolite::mongo(url = mongoConnParam$mongoUri,
+                                  db = mongoConnParam$mongoDb,
+                                  collection = mongoConnParam$collection)
+    
+    #> Return the number of records present in the query (for status)
+    numRecs <- mongoConn$count(query = mongoConnParam$query)
+    
+    #> Create an iterator (cursor) in the MongoDB    
+    it <- mongoConn$iterate(query = mongoConnParam$query,
+                            fields = mongoConnParam$fields)
+    
+    #> Connect to the PostgreSQL Database
+    pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                             host = pgConnParam$pgHost,
+                             port = pgConnParam$pgPort,
+                             user = pgConnParam$pgUser,
+                             password = pgConnParam$pgPass,
+                             dbname = pgConnParam$pgDb)
+    
+    rdx <- list(1)
+    
+    #> Establish a progress bar
+    pb <- utils::txtProgressBar(min = 0,
+                                max = numRecs,
+                                style = 3)
+    
+    #> The iterator returns `null` when it reaches the last record.    
+    while(!is.null(x <- it$one())){
+      
+      utils::setTxtProgressBar(pb = pb,
+                               value = rdx[[1]])
+      
+      # message(paste0("Acq Row: ",
+      #                as.character(rdx),
+      #                "  is ",
+      #                round(x = rdx/numRecs,
+      #                      digits = 3)*100,
+      #                "% complete!")
+      # )
+      
+      x <- it$one()
+      
+      temp <- tibble::tibble("sensorAcqState_pkid" = NA,
+                             "id" = x$`_id`,
+                             "runId" = x$runId,
+                             "runTime" = x$runTime,
+                             "designPoint" = x$designPoint,
+                             "iteration" = x$iteration,
+                             "time_ms" = x$time,
+                             "time_s" = x$time/1000,
+                             "receiverId" = x$event$receiverId,
+                             "senderId" = x$event$senderId,
+                             "sensorId" = x$event$messageData$any$sensorDetection$sensorId,
+                             "entityId" = x$event$messageData$any$sensorDetection$entityId,
+                             "targetId" = x$event$messageData$any$sensorDetection$targetId,
+                             "detectionLevel" = x$event$messageData$any$sensorDetection$detectionLevel,
+                             "previousDetectionLevel" = x$event$messageData$any$sensorDetection$previousDetectionLevel,
+                             "timeToDetection" = x$event$messageData$any$sensorDetection$timeToDetection) 
+      
+      temp_query <- fillTableQuery(data = temp,
+                                   tableName = "\"sensorAcqState\"",
+                                   serial = "DEFAULT")
+      
+      DBI::dbSendQuery(conn = pgConn,
+                       statement = temp_query)
+      
+      rdx[[1]] <- rdx[[1]] + 1
+      
+    }
+    
+    #> Clean up the progress bar object
+    close(pb)
+    rm(pb)
+    
+    #> Disconnect from the database when the job is complete.
+    DBI::dbDisconnect(conn = pgConn)
+    mongoConn$disconnect()
+    
+  } # close Iterate
+
+  message("Sensor Acq ETL Complete")
+  
+} # close fct_low_etlSensorAcq
+
+```
+
+# Mid Function
+
+## Sensor to Entity Mapping: `etlSensorToEntityMappingTables()`  
+
+Select information from the `AcquireModel.state.sensors` MongoDB collection and write it to the `sensorDescription`, `entityIdToName`, and `sensorToEntityId` PostgreSQL tables.  
 
 These tables provide maps to the various entity and sensor Ids produced by the simulation.  
 
-```{r fct_low_etlSensorToEntityMappingTables}
+```{r fct_mid_etlSensorToEntityMappingTables}
 
 #' ETL Sensor To Entity Mapping Tables
 #'
 #' This function queries the simulation's MongoDB, extracting specific information
-#'   from the state.sensors collection, transforms it by unnesting and relating
-#'   the fields. Finally, it writes the resulting data to tables in PostgreSQL
-#'   created by the `createModSimDb` function.
+#'   from the state.sensors collection, and it writes the resulting data to tables 
+#'   in PostgreSQL created by the `createModSimDb` function.
 #'
 #' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
@@ -149,22 +720,20 @@ These tables provide maps to the various entity and sensor Ids produced by the s
 #'   status but returns no information.
 #'
 #' @importFrom dplyr distinct mutate case_when rename
-#' @importFrom stringr str_replace_all str_detect str_extract
-etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
+#' @importFrom stringr str_detect str_extract
+#'
+#' @note Location: ./R/fct_step2_mid_etlSensorToEntityMappingTables.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+etlSensorToEntityMappingTables <- function(mongoConnParam,
+                                           pgConnParam,
+                                           designPoint,
+                                           batchSize){
   
   requireNamespace(package = "magrittr")
   
   { # Complete the MongoDB Connection Parameters ----
     
     mongoConnParam[["collection"]] <- "AcquireModel.state.sensors"
-    
-    mongoConnParam[["query"]] <- sprintf("{\"designPoint\": \"%s\"}",
-                                         designPoint)
-    
-    mongoConnParam[["fields"]] <- "{\"_id\": 1, \"runId\": 1, \"runTime\": 1,
-  \"designPoint\": 1, \"iteration\": 1, \"time\": 1, \"state.sensorId\": 1,
-  \"state.entityId\": 1, \"state.acquireSensorType\": 1,
-  \"state.magnification\": 1, \"state.status.source\": 1}"
     
   } # close Complete the MongoDB Connection Parameters
   
@@ -174,17 +743,12 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoin
       
       message("Extracting data from MongoDB")
       
-      entitySensorMapping <- modSim::mapSensorsAndEntities(mongoUri = mongoConnParam[["mongoUri"]],
-                                                           mongoDb = mongoConnParam[["mongoDb"]],
-                                                           mongoCollection = mongoConnParam[["collection"]],
-                                                           mongoFields = mongoConnParam[["fields"]],
-                                                           mongoQuery = mongoConnParam[["query"]])
+      entitySensorMapping <- mapSensorsAndEntities(mongoUri = mongoConnParam[["mongoUri"]],
+                                                   mongoDb = mongoConnParam[["mongoDb"]],
+                                                   mongoCollection = mongoConnParam[["collection"]],
+                                                   designPoint = designPoint)
       
-      metaData <- entitySensorMapping$UnnestedSensorState %>%
-        dplyr::distinct(.data = .,
-                        runId,
-                        designPoint,
-                        iteration)
+      metaData <- entitySensorMapping$metaData
       
     } # close Query MongoDb and unnest information about sensors and entities section
     
@@ -256,251 +820,20 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,pgConnParam,designPoin
       
     } # close sensorToEntityId section
     
-    { # unnestedSensorState ----
-      
-      message("Transforming and loading unnestedSensorState data.")
-      
-      #> This is the full set of un-nested data from the original query. While not truly "raw", this could be considered the original data set.
-      
-      entitySensorMapping$UnnestedSensorState <- entitySensorMapping$UnnestedSensorState %>%
-        dplyr::rename(.data = .,
-                      "id" = "_id",
-                      "time_ms" = "time")
-      
-      batch_fillAndWrite(data = entitySensorMapping$UnnestedSensorState,
-                         pgConnParam = pgConnParam,
-                         tableName = "unnestedSensorState",
-                         batchSize = batchSize,
-                         database = "PostgreSQL")
-      
-    } # close unnestedSensorState section
-    
   } # close Transform and Load section
   
-} # close fct_low_etlSensorToEntityMappingTables
+} # close fct_step2_mid_etlSensorToEntityMappingTables
 
 
-```
-
-```{r test_fct_low_etlSensorToEntityMappingTables,eval = FALSE}
-
-#> These source files read in the mongoURI and mongoDb elements and the PostgreSQL connection objects.
-
-source("./connectionObjects/pgConnectionObj.R")
-source("./connectionObjects/mongoConnectionObj.R")
-
-#> Add to the pgConnParam the database name 
-
-pgConnParam[["pgDb"]] <- "modSim3"
-
-fct_low_etlSensorToEntityMappingTables(mongoConnParam = mongoConnParam,
-                                       pgConnParam = pgConnParam,
-                                       designPoint = "NeilsTestScenario")
-
-```  
-
-
-## Line of Sight Tables  
-
-This table describes when a sensor target has Line of Sight (LOS). This does not mean they have acquired each other but rather that their line of sight is not obstructed. 
-
-```{r fct_low_etlLosData}
-
-#' ETL Line of Sight Data
-#'
-#' This function queries the LOSTargetStatus collection in the simulation
-#'  MongoDB, transforms and un-nests it and then writes it to the PostgreSQL
-#'  tables  created by the `creatModSimDb` function.
-#'
-#' @author Neil Kester, \email{nkester1@@jhu.edu}
-#'
-#' @param mongoConnParam This is a two element named list including the "mongoUri"
-#'   which includes the user name and password and a single character string and
-#'   the "mongoDb" name as a character string.
-#' @param pgConnParam A five element named list containing the following elements:
-#'  "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".
-#' @param designPoint This is a single character string with the designPoint you
-#'   would like to extract from the MongoDB and place into the PostgreSQL database.
-#'   If multiple designPoints are required then execute this function multiple
-#'   times. Note that this pulls ALL iterations executed for that designPoint.
-#' @param batchSize A numeric integer representing how many records you want to
-#'  write to the PostgreSQL database at a time.
-#'
-#' @return This returns messages to the console updating the user on the function's
-#'   status but returns no information.
-#'
-#' @importFrom dplyr rename mutate
-#' @importFrom stringr str_replace_all
-etlLosData <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
-  
-  requireNamespace(package = "magrittr")
-  
-  { # Complete the MongoDB Connection Parameters ----
-    
-    mongoConnParam[["collection"]] <- "AcquireModel.event.LOSTargetStatus"
-    
-    mongoConnParam[["query"]] <- sprintf("{\"designPoint\": \"%s\"}",
-                                         designPoint)
-    
-    mongoConnParam[["fields"]] <- "{\"_id\": true, \"runId\": true, \"runTime\": true,
-  \"designPoint\": true, \"iteration\": true, \"time\": true,\"event\": true}"
-    
-  } # close Complete the MongoDB Connection Parameters
-  
-  { # Extract ----
-    
-    message("Extracting data from the MongoDB")
-    
-    losData <- mongoUnnest(mongoUri = mongoConnParam[["mongoUri"]],
-                           mongoDb = mongoConnParam[["mongoDb"]],
-                           mongoCollection = mongoConnParam[["collection"]],
-                           mongoFields = mongoConnParam[["fields"]],
-                           mongoQuery = mongoConnParam[["query"]],
-                           unnestCols = "event")
-    
-  } # close Extract
-  
-  { # Transform and Load ----
-    
-    message("Transforming and loading losData")
-    
-    losData <- losData %>%
-      dplyr::rename("id" = "_id",
-                    "time_ms" = "time") %>%
-      dplyr::mutate(time_s = time_ms/1000,
-                    losState_pkId = NA)
-    
-    batch_fillAndWrite(data = losData,
-                       pgConnParam = pgConnParam,
-                       tableName = "losState",
-                       batchSize = batchSize,
-                       database = "PostgreSQL")
-    
-  } # close Transform and Load
-  
-} # close fct_low_etlLosData
-
-
-```
-
-```{r test_fct_low_etlLosData,eval=FALSE}
-
-#> These source files read in the mongoURI and mongoDb elements and the PostgreSQL connection objects.
-
-source("./connectionObjects/pgConnectionObj.R")
-source("./connectionObjects/mongoConnectionObj.R")
-
-#> Add to the pgConnParam the database name 
-
-pgConnParam[["pgDb"]] <- "modSim3"
-
-fct_low_etlLosData(mongoConnParam = mongoConnParam,
-                   pgConnParam = pgConnParam,
-                   designPoint = "NeilsTestScenario")
-
-```
-## Sensor Acquisition State Tables  
-
-Unlike the LOS table, this table shows the state of acquisition between each sensor target pair. It also shows the previous acquisition state so we can determine when the acquistion level changes. 
-
-```{r fct_low_etlSensorAcq}
-#' ETL Sensor Acquisition Data
-#'
-#' This function queries the simulation's MongoDB C2SimulationMessage collection,
-#'   transforms and unnestes it, and finally writes it to the PostgreSQL tables
-#'   created by the `createModSimDb` function.
-#'
-#' @author Neil Kester, \email{nkester1@@jhu.edu}
-#'
-#' @param mongoConnParamThis is a two element named list including the "mongoUri"
-#'   which includes the user name and password and a single character string and
-#'   the "mongoDb" name as a character string.
-#' @param pgConnParam A five element named list containing the following elements:
-#'  "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".
-#' @param designPoint This is a single character string with the designPoint you
-#'   would like to extract from the MongoDB and place into the PostgreSQL database.
-#'   If multiple designPoints are required then execute this function multiple
-#'   times. Note that this pulls ALL iterations executed for that designPoint.
-#' @param batchSize A numeric integer representing how many records you want to
-#'  write to the PostgreSQL database at a time.
-#'
-#' @return This returns messages to the console updating the user on the function's
-#'   status but returns no information.
-#'
-#' @importFrom dplyr rename mutate
-etlSensorAcq <- function(mongoConnParam,pgConnParam,designPoint,batchSize){
-  
-  requireNamespace(package = "magrittr")
-  
-  { # Complete the MongoDB Connection Parameters ----
-    
-    mongoConnParam[["collection"]] <- "AcquireModel.event.C2SimulationMessage"
-    
-    mongoConnParam[["query"]] <- sprintf("{\"designPoint\": \"%s\", \"event.messageData.javaClass\": \"sensorproto.SensorModel$DetectedTarget\"}",
-                                         designPoint)
-    
-    mongoConnParam[["fields"]] <- "{\"runId\": 1,\"runTime\": 1, \"designPoint\": 1,\"iteration\": 1, \"time\": 1, \"event.receiverId\": 1, \"event.senderId\": 1,\"event.messageData.any.sensorDetection\": 1}"
-    
-  } # close Complete the MongoDB Connection Parameters
-  
-  { # Extract ----
-    
-    message("Extracting data from the MongoDB")
-    
-    sensorAcqData <- modSim::sensorAcquisition(mongoUri = mongoConnParam[["mongoUri"]],
-                                               mongoDb = mongoConnParam[["mongoDb"]],
-                                               mongoCollection = mongoConnParam[["collection"]],
-                                               mongoQuery = mongoConnParam[["query"]],
-                                               mongoFields = mongoConnParam[["fields"]],
-                                               recursiveUnnests = c("event",
-                                                                    "messageData",
-                                                                    "any",
-                                                                    "sensorDetection"))
-    
-  } # close Extract
-  
-  { # Transform and Load ----
-    
-    message("Transforming and loading sensorAcqState Data!")
-    
-    sensorAcqData <- sensorAcqData %>%
-      dplyr::rename("id" = "_id",
-                    "time_ms" = "time") %>%
-      dplyr::mutate(time_s = time_ms/1000,
-                    sensorAcqState_pkId = NA)
-    
-    batch_fillAndWrite(data = sensorAcqData,
-                       pgConnParam = pgConnParam,
-                       tableName = "sensorAcqState",
-                       batchSize = batchSize,
-                       database = "PostgreSQL")
-    
-  } # close Transform and Load
-  
-} # close fct_low_etlSensorAcq
-
-```
-
-```{r test_fct_low_etlSensorAcq, eval=FALSE}
-
-#> These source files read in the mongoURI and mongoDb elements and the PostgreSQL connection objects.
-
-source("../connectionObjects/pgConnectionObj.R")
-source("../connectionObjects/mongoConnectionObj.R")
-
-#> Add to the pgConnParam the database name 
-
-pgConnParam[["pgDb"]] <- "modSim3"
-
-fct_low_etlSensorAcq(mongoConnParam = mongoConnParam,
-                     pgConnParam = pgConnParam,
-                     designPoint = "NeilsTestScenario")
-getwd()
 ```
 
 # High Function  
 
+## Query MongoDB and Fill PostgreSQL: `queryMongoAndFillPg()`  
+
 This function takes three elements as inputs, `mongoConnParam`, `pgConnParam`, and `designPoint` which are used by each of the low functions. Each low function queries and unpackes different collections from the Simulation MongoDB and stores them in the PostgreSQL Relational Database created in the previous step.  
+
+This is the only function exported from this step in the process.  
 
 ```{r fct_high_queryMongoAndFillPg}
 #' Query MongoDB And Fill PostgreSQL
@@ -527,9 +860,14 @@ This function takes three elements as inputs, `mongoConnParam`, `pgConnParam`, a
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
 #'
-#' @export queryMongoAndFillPg
+#' @export Step2_queryMongoAndFillPg
 #'
-queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint,batchSize=100){
+#' @note Location: ./R/fct_step2_high_queryMongoAndFillPg.R
+#' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+Step2_queryMongoAndFillPg <- function(mongoConnParam,
+                                pgConnParam,
+                                designPoint,
+                                batchSize=100){
   
   message("Reading from MongDB Acquire.State.Sensor collection and writing to PostgreSQL sensorDescription, entityIdToName, sensorToEntityId, and unnestedSensorState tables.")
   
@@ -542,15 +880,13 @@ queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint,batchSize
   
   etlLosData(mongoConnParam = mongoConnParam,
              pgConnParam = pgConnParam,
-             designPoint = designPoint,
-             batchSize = batchSize)
+             designPoint = designPoint)
   
   message("Reading from MongoDb AcquireModel.event.C2SimulationMessage collection and writing to PostgreSQL sensorAcqState table.")
   
   etlSensorAcq(mongoConnParam = mongoConnParam,
                pgConnParam = pgConnParam,
-               designPoint = designPoint,
-               batchSize = batchSize)
+               designPoint = designPoint)
   
   { # Refresh the materialized Views ----
     
@@ -578,28 +914,56 @@ queryMongoAndFillPg <- function(mongoConnParam,pgConnParam,designPoint,batchSize
     
   } # close Refresh the materialized Views section
   
-} # close fct_high_queryMongoAndFillPg
+  return("Complete!")
+  
+} # close Step2_queryMongoAndFillPg
 
 ```   
 
-This is how this function would be executed:  
+# Execution
+
+This is how this function would be executed . Note, the following is the structure of the input parameters.  
+
+mongoConnParam:  
+
+```{r,echo=FALSE}
+list("mongoUri" = "monogdb://<username>:<password>@<host.path.to.mongodb>:<port>",
+     "mongoDb" = "databaseName")
+```  
+
+pgConnParam:  
+
+```{r, echo=FALSE}
+list("pgHost" = "<host.path.to.postgreSQL>",
+     "pgPort" = 5432,
+     "pgUser" = "<username>",
+     "pgPass" = "<password>",
+     "pgDb" = "<databaseName>")
+```
+
+Implement the function in this way:  
 
 ```{r, eval=FALSE}
 
 #> These source files read in the mongoURI and mongoDb elements and the PostgreSQL connection objects.
 
-source("./connectionObjects/pgConnectionObj.R")
-source("./connectionObjects/mongoConnectionObj.R")
+source("../connectionObjects/pgConnectionObj.R")
+source("../connectionObjects/mongoConnectionObj.R")
 
 #> Add to the pgConnParam the database name 
 
-pgConnParam[["pgDb"]] <- "modSim4"
+pgConnParam[["pgDb"]] <- "modSimIt5"  
+
+#> The design point I want to load  
+
+designPoint <- "myDesignPoint"
 
 #> Execute the function  
 
-fct_high_queryMongoAndFillPg(mongoConnParam = mongoConnParam,
-                             pgConnParam = pgConnParam,
-                             designPoint = "NeilsTestScenario")
+response <- queryMongoAndFillPg(mongoConnParam = mongoConnParam,
+                    pgConnParam = pgConnParam,
+                    designPoint = designPoint)
+
 
 ```
 

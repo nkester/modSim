@@ -4,7 +4,7 @@
 \alias{etlLosData}
 \title{ETL Line of Sight Data}
 \usage{
-etlLosData(mongoConnParam, pgConnParam, designPoint, batchSize)
+etlLosData(mongoConnParam, pgConnParam, designPoint)
 }
 \arguments{
 \item{mongoConnParam}{This is a two element named list including the "mongoUri"
@@ -18,9 +18,6 @@ the "mongoDb" name as a character string.}
 would like to extract from the MongoDB and place into the PostgreSQL database.
 If multiple designPoints are required then execute this function multiple
 times. Note that this pulls ALL iterations executed for that designPoint.}
-
-\item{batchSize}{A numeric integer representing how many records you want to
-write to the PostgreSQL database at a time.}
 }
 \value{
 This returns messages to the console updating the user on the function's
@@ -28,8 +25,14 @@ This returns messages to the console updating the user on the function's
 }
 \description{
 This function queries the LOSTargetStatus collection in the simulation
- MongoDB, transforms and un-nests it and then writes it to the PostgreSQL
- tables  created by the `creatModSimDb` function.
+ MongoDB, extracts the required fields, and then writes it to the PostgreSQL
+ tables created by the `creatModSimDb` function. This operates as an iterator
+ with MongoDB so it executes one record at a time.
+}
+\note{
+Location: ./R/fct_step2_low_etlLosData.R
+
+RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}

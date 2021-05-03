@@ -8,7 +8,7 @@ fillTableQuery(data, tableName, serial = "DEFAULT")
 }
 \arguments{
 \item{data}{This is a tibble of any dimension although thought should be given
-to very large datasets. It may be better to break the INSERT query into multiple
+to very large data sets. It may be better to break the INSERT query into multiple
 smaller pushes.}
 
 \item{tableName}{This is the name of the table. Note that some DBMS (namely)
@@ -34,6 +34,11 @@ This function takes a data frame and a table name (optionally including the
   add the proper entry for auto-incrementing columns, pass an `NA` value for
   that field in the `data` parameter and provide the keyword in the `serial`
   parameter.
+}
+\note{
+Location: ./R/fct_utils_fillTableQuery.R
+
+RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}

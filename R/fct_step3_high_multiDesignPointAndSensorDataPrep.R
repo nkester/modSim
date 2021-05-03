@@ -15,14 +15,22 @@
 #'  structure data for.
 #'
 #' @return This returns a two element named list of consolidated data at the iteration
-#'  and designPoint level.
+#'  and designPoint level. DesignPoint level data is aggregated across the iterations
+#'  executed for each designPoint. Metrics calculated for that aggregation include
+#'  the mean, variance, standard deviation, and standard error.
 #'
-#' @export multiDesingPointAndSensorDataPrep
+#' @export Step3_multiDesingPointAndSensorDataPrep
 #'
 #' @importFrom tibble tibble
 #' @importFrom dplyr bind_rows
 #' @importFrom tidyr drop_na
-multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targetForce,designPoints,sensors){
+#'
+#' @note Location: ./R/fct_step3_high_multiDesignPointAndSensorDataPrep.R
+Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
+                                                    sensorForce,
+                                                    targetForce,
+                                                    designPoints,
+                                                    sensors){
 
   { # set up
 
@@ -31,6 +39,7 @@ multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targetForc
                                                     iteration=NA,
                                                     count=NA,
                                                     sensorShortName=NA)
+
     consolidateGraphDataMean <- tibble::tibble(time_s=NA,
                                                designPoint=NA,
                                                sensorShortName=NA,
@@ -43,7 +52,9 @@ multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targetForc
 
   for(designPoint in designPoints){
 
-    message(paste0("\nWorking on ",designPoint, " designPoint.\n"))
+    message(paste0("\nWorking on ",
+                   designPoint,
+                   " designPoint.\n"))
 
     { # Query
 
@@ -52,11 +63,15 @@ multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targetForc
                                    targetForce = targetForce,
                                    designPoint = designPoint)
 
-    }
+    } # close Query
 
     for(sensor in sensors){
 
-      message(paste0("\nWorking on ",sensor, " sensor in ", designPoint, " designPoint.\n"))
+      message(paste0("\nWorking on ",
+                     sensor,
+                     " sensor in ",
+                     designPoint,
+                     " designPoint.\n"))
 
       temp <- graphDataPrep(losMatViewData = designPointData$losMatViewData,
                             acqMatViewData = designPointData$acqMatViewData,
@@ -85,4 +100,4 @@ multiDesingPointAndSensorDataPrep <- function(pgConnParam,sensorForce,targetForc
   return(list("byIteration" = consolidateGraphDataIteration,
               "byDesignPoint" = consolidateGraphDataMean))
 
-} # close function
+} # close Step3_multiDesingPointAndSensorDataPrep function
