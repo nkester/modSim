@@ -105,9 +105,17 @@ etlLosData <- function(mongoConnParam,
                              "targetId" = x$event$targetId,
                              "hasLOS" = x$event$hasLOS)
 
-      temp_query <- fillTableQuery(data = temp,
-                                   tableName = "\"losState\"",
-                                   serial = "DEFAULT")
+      temp_query <- tryCatch(expr = fillTableQuery(data = temp,
+                                                   tableName = "\"losState\"",
+                                                   serial = "DEFAULT"),
+                             warning = function(w){
+                               message(w)
+                               return("")
+                             },
+                             error = function(e){
+                               message(e)
+                               return("")
+                             })
 
       DBI::dbSendQuery(conn = pgConn,
                        statement = temp_query)
