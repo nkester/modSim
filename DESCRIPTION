@@ -1,7 +1,7 @@
 Package: modSim
 Type: Package
 Title: This package contains functions used to support my JHU Thesis work.
-Version: 0.4.0
+Version: 0.4.3
 Author: Neil Kester
 Maintainer: Neil Kester <nkester1@jh.edu>
 Description: These functions do everything from simple queries and unnesting of a
