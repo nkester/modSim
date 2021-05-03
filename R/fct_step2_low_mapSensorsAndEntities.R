@@ -28,7 +28,7 @@
 mapSensorsAndEntities <- function(mongoUri,
                                   mongoDb,
                                   mongoCollection,
-                                  desingPoint){
+                                  designPoint){
 
   mongoConnection <- mongolite::mongo(url = mongoUri,
                                       db = mongoDb,
@@ -36,8 +36,8 @@ mapSensorsAndEntities <- function(mongoUri,
 
   { # SENSOR DESCRIPTION ----
 
-    pipeline_sensorDescription <- sprintf("[{\"$match\":{\"%s\": \"WASP1_high_high_20210426\"}},{\"$group\":{\"_id\": {\"sensorId\": \"$state.sensorId\",\"acquireSensorType\": \"$state.acquireSensorType\",\"magnification\": \"$state.magnification\"}}}]",
-                                          desingPoint)
+    pipeline_sensorDescription <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"sensorId\": \"$state.sensorId\",\"acquireSensorType\": \"$state.acquireSensorType\",\"magnification\": \"$state.magnification\"}}}]",
+                                          designPoint)
 
     sensorDescription <- mongoConnection$aggregate(pipeline = pipeline_sensorDescription)
     names(sensorDescription) <- "id"
@@ -47,10 +47,10 @@ mapSensorsAndEntities <- function(mongoUri,
 
   { # ENTITY ID TO NAME ----
 
-    pipeline_entityIdToName <- sprintf("[{\"$match\":{\"%s\": \"WASP1_high_high_20210426\"}},{\"$group\":{\"_id\": {\"entityId\": \"$state.entityId\",\"source\": \"$state.status.source\"}}}]",
-                                       desingPoint)
+    pipeline_entityIdToName <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"entityId\": \"$state.entityId\",\"source\": \"$state.status.source\"}}}]",
+                                       designPoint)
 
-    entityIdToName <- mongoConnection$aggregate(pipeline = )
+    entityIdToName <- mongoConnection$aggregate(pipeline = pipeline_entityIdToName)
     names(entityIdToName) <- "id"
     entityIdToName <- tibble::tibble(entityIdToName$id)
 
@@ -58,8 +58,8 @@ mapSensorsAndEntities <- function(mongoUri,
 
   { # SENSOR TO ENTITY ----
 
-    pipeline_sensorToEntity <- sprintf("[{\"$match\":{\"%s\": \"WASP1_high_high_20210426\"}},{\"$group\":{\"_id\": {\"entityId\": \"$state.entityId\",\"sensorId\": \"$state.sensorId\"}}}]",
-                                       desingPoint)
+    pipeline_sensorToEntity <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"entityId\": \"$state.entityId\",\"sensorId\": \"$state.sensorId\"}}}]",
+                                       designPoint)
 
     sensorToEntity <- mongoConnection$aggregate(pipeline = pipeline_sensorToEntity)
     names(sensorToEntity) <- "id"
@@ -69,8 +69,8 @@ mapSensorsAndEntities <- function(mongoUri,
 
   { # META DATA ----
 
-    pipeline_metaData <- sprintf("[{\"$match\":{\"%s\": \"WASP1_high_high_20210426\"}},{\"$group\":{\"_id\": {\"runId\": \"$runId\",\"designPoint\": \"$designPoint\",\"iteration\": \"$iteration\"}}}]",
-                                 desingPoint)
+    pipeline_metaData <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"runId\": \"$runId\",\"designPoint\": \"$designPoint\",\"iteration\": \"$iteration\"}}}]",
+                                 designPoint)
 
     metaData <- mongoConnection$aggregate(pipeline = pipeline_metaData)
     names(metaData) <- "id"

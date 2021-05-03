@@ -344,7 +344,7 @@ sendPgFillTableQuery <- function(query,
 mapSensorsAndEntities <- function(mongoUri,
                                   mongoDb,
                                   mongoCollection,
-                                  desingPoint){
+                                  designPoint){
 
   mongoConnection <- mongolite::mongo(url = mongoUri,
                                       db = mongoDb,
@@ -352,8 +352,8 @@ mapSensorsAndEntities <- function(mongoUri,
 
   { # SENSOR DESCRIPTION ----
     
-    pipeline_sensorDescription <- sprintf("[{\"$match\":{\"%s\": \"WASP1_high_high_20210426\"}},{\"$group\":{\"_id\": {\"sensorId\": \"$state.sensorId\",\"acquireSensorType\": \"$state.acquireSensorType\",\"magnification\": \"$state.magnification\"}}}]",
-                                          desingPoint)
+    pipeline_sensorDescription <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"sensorId\": \"$state.sensorId\",\"acquireSensorType\": \"$state.acquireSensorType\",\"magnification\": \"$state.magnification\"}}}]",
+                                          designPoint)
     
     sensorDescription <- mongoConnection$aggregate(pipeline = pipeline_sensorDescription)
     names(sensorDescription) <- "id"
@@ -363,10 +363,10 @@ mapSensorsAndEntities <- function(mongoUri,
 
   { # ENTITY ID TO NAME ----
     
-    pipeline_entityIdToName <- sprintf("[{\"$match\":{\"%s\": \"WASP1_high_high_20210426\"}},{\"$group\":{\"_id\": {\"entityId\": \"$state.entityId\",\"source\": \"$state.status.source\"}}}]",
-                                          desingPoint)
+    pipeline_entityIdToName <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"entityId\": \"$state.entityId\",\"source\": \"$state.status.source\"}}}]",
+                                          designPoint)
     
-    entityIdToName <- mongoConnection$aggregate(pipeline = )
+    entityIdToName <- mongoConnection$aggregate(pipeline = pipeline_entityIdToName)
     names(entityIdToName) <- "id"
     entityIdToName <- tibble::tibble(entityIdToName$id)
 
@@ -374,8 +374,8 @@ mapSensorsAndEntities <- function(mongoUri,
 
   { # SENSOR TO ENTITY ----
     
-    pipeline_sensorToEntity <- sprintf("[{\"$match\":{\"%s\": \"WASP1_high_high_20210426\"}},{\"$group\":{\"_id\": {\"entityId\": \"$state.entityId\",\"sensorId\": \"$state.sensorId\"}}}]",
-                                          desingPoint)
+    pipeline_sensorToEntity <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"entityId\": \"$state.entityId\",\"sensorId\": \"$state.sensorId\"}}}]",
+                                          designPoint)
     
     sensorToEntity <- mongoConnection$aggregate(pipeline = pipeline_sensorToEntity)
     names(sensorToEntity) <- "id"
@@ -385,8 +385,8 @@ mapSensorsAndEntities <- function(mongoUri,
 
   { # META DATA ----
     
-    pipeline_metaData <- sprintf("[{\"$match\":{\"%s\": \"WASP1_high_high_20210426\"}},{\"$group\":{\"_id\": {\"runId\": \"$runId\",\"designPoint\": \"$designPoint\",\"iteration\": \"$iteration\"}}}]",
-                                          desingPoint)
+    pipeline_metaData <- sprintf("[{\"$match\":{\"designPoint\": \"%s\"}},{\"$group\":{\"_id\": {\"runId\": \"$runId\",\"designPoint\": \"$designPoint\",\"iteration\": \"$iteration\"}}}]",
+                                          designPoint)
     
     metaData <- mongoConnection$aggregate(pipeline = pipeline_metaData)
     names(metaData) <- "id"
@@ -435,6 +435,7 @@ This table describes when a sensor target has Line of Sight (LOS). This does not
 #' @importFrom RPostgreSQL PostgreSQL
 #' @importFrom DBI dbConnect dbSendQuery dbDisconnect
 #' @importFrom tibble tibble
+#' @importFrom utils txtProgressBar setTxtProgressBar
 #'
 #' @note Location: ./R/fct_step2_low_etlLosData.R
 #' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
@@ -480,18 +481,26 @@ etlLosData <- function(mongoConnParam,
                              password = pgConnParam$pgPass,
                              dbname = pgConnParam$pgDb)
     
-    rdx <- 1
+    rdx <- list(1)
+    
+    #> Establish a progress bar
+    pb <- utils::txtProgressBar(min = 0,
+                                max = numRecs,
+                                style = 3)
     
     #> The iterator returns `null` when it reaches the last record.
     while(!is.null(x <- it$one())){
       
-      message(paste0("LOS Row: ",
-                     as.character(rdx),
-                     "  is ",
-                     round(x = rdx/numRecs,
-                           digits = 3)*100,
-                     "% complete!")
-      )
+      utils::setTxtProgressBar(pb = pb,
+                               value = rdx[[1]])
+      
+      # message(paste0("LOS Row: ",
+      #                as.character(rdx),
+      #                "  is ",
+      #                round(x = rdx/numRecs,
+      #                      digits = 3)*100,
+      #                "% complete!")
+      # )
       
       x <- it$one()
       
@@ -514,9 +523,13 @@ etlLosData <- function(mongoConnParam,
       DBI::dbSendQuery(conn = pgConn,
                        statement = temp_query)
       
-      rdx <- rdx + 1
+      rdx[[1]] <- rdx[[1]] + 1
       
-    }
+    } # close While loop for iterator
+    
+    #> Clean up the progress bar object
+    close(pb)
+    rm(pb)
     
     #> Disconnect from the databases when the job is complete.
     DBI::dbDisconnect(conn = pgConn)
@@ -536,6 +549,7 @@ etlLosData <- function(mongoConnParam,
 Unlike the LOS table, this table shows the state of acquisition between each sensor target pair. It also shows the previous acquisition state so we can determine when the acquistion level changes. 
 
 ```{r fct_low_etlSensorAcq}
+
 #' ETL Sensor Acquisition Data
 #'
 #' This function queries the C2SimulationMessage collection in the simulation
@@ -562,6 +576,7 @@ Unlike the LOS table, this table shows the state of acquisition between each sen
 #' @importFrom RPostgreSQL PostgreSQL
 #' @importFrom DBI dbConnect dbSendQuery dbDisconnect
 #' @importFrom tibble tibble
+#' @importFrom utils txtProgressBar setTxtProgressBar
 #'
 #' @note Location: ./R/fct_step2_low_etlSensorAcq.R
 #' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
@@ -604,18 +619,26 @@ etlSensorAcq <- function(mongoConnParam,
                              password = pgConnParam$pgPass,
                              dbname = pgConnParam$pgDb)
     
-    rdx <- 1
+    rdx <- list(1)
+    
+    #> Establish a progress bar
+    pb <- utils::txtProgressBar(min = 0,
+                                max = numRecs,
+                                style = 3)
     
     #> The iterator returns `null` when it reaches the last record.    
     while(!is.null(x <- it$one())){
       
-      message(paste0("Acq Row: ",
-                     as.character(rdx),
-                     "  is ",
-                     round(x = rdx/numRecs,
-                           digits = 3)*100,
-                     "% complete!")
-      )
+      utils::setTxtProgressBar(pb = pb,
+                               value = rdx[[1]])
+      
+      # message(paste0("Acq Row: ",
+      #                as.character(rdx),
+      #                "  is ",
+      #                round(x = rdx/numRecs,
+      #                      digits = 3)*100,
+      #                "% complete!")
+      # )
       
       x <- it$one()
       
@@ -643,10 +666,15 @@ etlSensorAcq <- function(mongoConnParam,
       DBI::dbSendQuery(conn = pgConn,
                        statement = temp_query)
       
-      rdx <- rdx + 1
+      rdx[[1]] <- rdx[[1]] + 1
       
     }
     
+    #> Clean up the progress bar object
+    close(pb)
+    rm(pb)
+    
+    #> Disconnect from the database when the job is complete.
     DBI::dbDisconnect(conn = pgConn)
     mongoConn$disconnect()
     
@@ -718,7 +746,7 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,
       entitySensorMapping <- mapSensorsAndEntities(mongoUri = mongoConnParam[["mongoUri"]],
                                                    mongoDb = mongoConnParam[["mongoDb"]],
                                                    mongoCollection = mongoConnParam[["collection"]],
-                                                   designPoint)
+                                                   designPoint = designPoint)
       
       metaData <- entitySensorMapping$metaData
       

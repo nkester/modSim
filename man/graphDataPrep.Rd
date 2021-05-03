@@ -25,6 +25,8 @@ This takes the results from `low_queryData` and returns expanded data for each
 }
 \note{
 Location: ./R/fct_step3_low_graphDataPrep.R
+
+RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}

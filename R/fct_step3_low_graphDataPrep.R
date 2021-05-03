@@ -18,7 +18,10 @@
 #'  select n left_join
 #' @importFrom tidyr unnest fill replace_na
 #'
+#' @export graphDataPrep
+#'
 #' @note Location: ./R/fct_step3_low_graphDataPrep.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 graphDataPrep <- function(losMatViewData,
                           acqMatViewData,
                           sensor){

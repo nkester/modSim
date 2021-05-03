@@ -24,6 +24,7 @@
 #' @importFrom RPostgreSQL PostgreSQL
 #' @importFrom DBI dbConnect dbSendQuery dbDisconnect
 #' @importFrom tibble tibble
+#' @importFrom utils txtProgressBar setTxtProgressBar
 #'
 #' @note Location: ./R/fct_step2_low_etlSensorAcq.R
 #' @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
@@ -66,18 +67,26 @@ etlSensorAcq <- function(mongoConnParam,
                              password = pgConnParam$pgPass,
                              dbname = pgConnParam$pgDb)
 
-    rdx <- 1
+    rdx <- list(1)
+
+    #> Establish a progress bar
+    pb <- utils::txtProgressBar(min = 0,
+                                max = numRecs,
+                                style = 3)
 
     #> The iterator returns `null` when it reaches the last record.
     while(!is.null(x <- it$one())){
 
-      message(paste0("Acq Row: ",
-                     as.character(rdx),
-                     "  is ",
-                     round(x = rdx/numRecs,
-                           digits = 3)*100,
-                     "% complete!")
-      )
+      utils::setTxtProgressBar(pb = pb,
+                               value = rdx[[1]])
+
+      # message(paste0("Acq Row: ",
+      #                as.character(rdx),
+      #                "  is ",
+      #                round(x = rdx/numRecs,
+      #                      digits = 3)*100,
+      #                "% complete!")
+      # )
 
       x <- it$one()
 
@@ -105,10 +114,15 @@ etlSensorAcq <- function(mongoConnParam,
       DBI::dbSendQuery(conn = pgConn,
                        statement = temp_query)
 
-      rdx <- rdx + 1
+      rdx[[1]] <- rdx[[1]] + 1
 
     }
 
+    #> Clean up the progress bar object
+    close(pb)
+    rm(pb)
+
+    #> Disconnect from the database when the job is complete.
     DBI::dbDisconnect(conn = pgConn)
     mongoConn$disconnect()
 

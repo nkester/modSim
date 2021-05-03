@@ -17,7 +17,10 @@
 #'
 #' @importFrom DBI dbConnect dbGetQuery dbDisconnect
 #'
+#' @export queryData
+#'
 #' @note Location: ./R/fct_step3_low_queryData.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 queryData <- function(pgConnParam,
                       sensorForce,
                       targetForce,

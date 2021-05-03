@@ -48,7 +48,7 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,
       entitySensorMapping <- mapSensorsAndEntities(mongoUri = mongoConnParam[["mongoUri"]],
                                                    mongoDb = mongoConnParam[["mongoDb"]],
                                                    mongoCollection = mongoConnParam[["collection"]],
-                                                   designPoint)
+                                                   designPoint = designPoint)
 
       metaData <- entitySensorMapping$metaData
 
@@ -125,4 +125,3 @@ etlSensorToEntityMappingTables <- function(mongoConnParam,
   } # close Transform and Load section
 
 } # close fct_step2_mid_etlSensorToEntityMappingTables
-

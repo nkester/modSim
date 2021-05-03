@@ -43,6 +43,8 @@ Specifically, this is used to produce a list of two tibbles with data pertaining
 #'  
 #' @importFrom DBI dbConnect dbGetQuery dbDisconnect  
 #'
+#' @export queryData
+#'
 #' @note Location: ./R/fct_step3_low_queryData.R
 #' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 queryData <- function(pgConnParam,
@@ -114,6 +116,8 @@ queryData <- function(pgConnParam,
 #' @importFrom dplyr mutate distinct_all filter group_by summarise ungroup
 #'  select n left_join
 #' @importFrom tidyr unnest fill replace_na
+#'
+#' @export graphDataPrep
 #'
 #' @note Location: ./R/fct_step3_low_graphDataPrep.R
 #' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
@@ -279,7 +283,7 @@ This high level function is used to query and prepare data in the two PostgreSQL
 Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
                                                     sensorForce,
                                                     targetForce,
-                                                    designPoints,
+                                                    designPoint,
                                                     sensors){
   
   { # set up

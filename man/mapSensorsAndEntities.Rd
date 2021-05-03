@@ -4,7 +4,7 @@
 \alias{mapSensorsAndEntities}
 \title{Map Sensors and Entities}
 \usage{
-mapSensorsAndEntities(mongoUri, mongoDb, mongoCollection, desingPoint)
+mapSensorsAndEntities(mongoUri, mongoDb, mongoCollection, designPoint)
 }
 \arguments{
 \item{mongoUri}{This is a double quoted character string of the connection
