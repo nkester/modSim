@@ -242,7 +242,89 @@ graphDataPrep <- function(losMatViewData,
 
 ```
 
+## Target Column Graph Data: `targetColumnGraphData()`  
+
+This data is aggregated at the target level in order to see which targets the sensor entity is viewing.
+
+```{r}
+targetColumnGraphData <- function(losMatViewData,
+                          acqMatViewData,
+                          sensor){
+  
+    { # LOS Data Prep
+      
+      los <- losMatViewData %>%
+        dplyr::mutate(time_s = as.numeric(time_s)) %>%
+        dplyr::mutate(time_s = round(x = time_s,
+                                     digits = 0)) %>%
+        dplyr::distinct_all() %>%
+        dplyr::filter(sensorShortName %in% sensor) %>%
+        dplyr::group_by(time_s,
+                        sensorShortName,
+                        iteration,
+                        designPoint,
+                        targetShortName) %>%
+        dplyr::summarise(count = sum(hasLOS),
+                         .groups = "keep") %>%
+        dplyr::ungroup() %>%
+        dplyr::group_by(time_s,
+                        sensorShortName,
+                        designPoint,
+                        targetShortName) %>%
+        tidyr::replace_na(list(count = 0)) %>%
+        dplyr::summarise(count_mean = mean(count),
+                         count_var = var(count),
+                         count_sd = sd(count),
+                         count_se = count_sd/sqrt(dplyr::n()),
+                         type = "LOS",
+                         .groups = "keep") %>%
+        dplyr::ungroup()
+      
+    } # close LOS Data Prep
+    
+    { # ACQ Data Prep
+      
+      acq <- acqMatViewData %>%
+        dplyr::mutate(time_s = as.numeric(time_s)) %>%
+        dplyr::mutate(time_s = round(x = time_s,
+                                     digits = 0)) %>%
+        dplyr::distinct_all() %>%
+        dplyr::filter(sensorShortName %in% sensor) %>%
+        dplyr::group_by(time_s,
+                        sensorShortName,
+                        iteration,
+                        designPoint,
+                        targetShortName) %>%
+        dplyr::summarise(count = sum(hasAcq),
+                         .groups = "keep") %>%
+        dplyr::ungroup() %>%
+        dplyr::group_by(time_s,
+                        sensorShortName,
+                        designPoint,
+                        targetShortName) %>%
+        tidyr::replace_na(list(count = 0)) %>%
+        dplyr::summarise(count_mean = mean(count),
+                         count_var = var(count),
+                         count_sd = sd(count),
+                         count_se = count_sd/sqrt(dplyr::n()),
+                         type = "ACQ",
+                         .groups = "keep") %>%
+        dplyr::ungroup()
+      
+    } # close ACQ Data Prep
+    
+    histData <- dplyr::bind_rows(los,acq)
+    
+    return(histData)
+    
+}
+```
+
+
 # Mid Functions
+
+
+
 
 # High Functions
 
@@ -416,6 +498,63 @@ Step3_graphMean <- function(graphData,
   return(p)
   
 } # Step3_graphMean function
+```
+
+## Produce Column Plot of Multiple DesignPoints for a Single Sensor  
+
+This function takes 
+```{r}
+
+graphTargetColumnByDesign <- function(designPoints,pgConnParam,sensorForce,targetForce,sensor){
+  
+  requireNamespace(magrittr)
+  
+  histData <- tibble::tibble(time_s = NA,
+                             sensorShortName = "NA",
+                             designPoint = "NA",
+                             targetShortName = "NA",
+                             count_mean = 1.0,
+                             count_var = 1.0,
+                             count_sd = 1.0,
+                             cound_se = 1.0,
+                             type = "NA")[0,]
+  
+  for(designPoint in designPoints){
+    
+    tempData <- modSim::queryData(pgConnParam = pgConnParam,
+                                  sensorForce = sensorForce,
+                                  targetForce = targetForce,
+                                  designPoint = designPoint)
+    
+    losMatViewData <- tempData$losMatViewData 
+    acqMatViewData <- tempData$acqMatViewData
+    sensor <- "WASP 1"
+    
+    data <- targetColumnGraphData(losMatViewData=losMatViewData,
+                                  acqMatViewData=acqMatViewData,
+                                  sensor=sensor)
+    
+    histData <- dplyr::bind_rows(histData,data)
+    
+  } # close for designPoints
+  
+  { # Produce the Plot
+    
+    p <-ggplot2::ggplot(histData) + 
+      ggplot2::geom_col(mapping = ggplot2::aes(x = time_s,
+                                               y = count_mean,
+                                               fill = targetShortName)) + 
+      #ggplot2::geom_errorbar(mapping = ggplot2::aes(x = time_s,ymax = count_mean + count_se,ymin = count_mean - count_se,color = targetShortName)) +
+      ggplot2::facet_grid(type ~ designPoint) +
+      ggplot2::theme_minimal() +
+      ggplot2::theme(title = ggplot2::element_text("LOS and ACQ broken out by DesignPoint and Target"))
+    
+  } # close Produce the Plot
+  
+  return(list("targetData" = histData,
+              "targetPlot" = p))
+  
+} # close graphTargetColumnByDesign function
 ```
 
 ```{r commonParameters}
