@@ -24,30 +24,86 @@ pgConnParam <- list(
 )
 ```  
 
-## Establishing The PostgreSQL Database  
+## Step 1: Establishing The PostgreSQL Database  
 
 This only needs to be done if a new database is required or the database has not yet been created.  
 
 ```
 
-modSim::createModSimDb(connParamList = pgConnParam)
+modSim::Step1_createModSimDb(connParamList = pgConnParam)
 
 ```  
 
-## Extract Tranform and Load a Design Point  
+## Step 2: Extract Transfrom and Load (ETL) data from MongoDB to PostgreSQL by design point  
 
 This should be executed for each designPoint that needs to be added to the PostgreSQL database.  
 
 ```
 
-designPoint <- "<designPoint>"
+designPoints <- "<designPoint>"
 
-modSim::queryMongoAndFillPg(mongoConnParam = mongoConnParam,
-                            pgConnParam = pgConnParam,
-                            designPoint = designPoint)
+# OR
+
+designPoints <- c("<designPoint1>","<designPoint2>","<designPoint3>","<designPoint4>")
+
+for(designPoint in designPoints){
+  
+  modSim::Step2_queryMongoAndFillPg(mongoConnParam = mongoConnParam,
+                                    pgConnParam = pgConnParam,
+                                    designPoint = designPoint)
+  
+}
 
 ```  
 
-## FUTURE: Apply Analytic and Produce Visuals  
+## Step 3: Visualize  
 
-To be added.
+In addition to the parameters required above, these must be specified:  
+
+```
+sensorForce <- "BLUEFORCE"
+targetForce <- "REDFORCE"
+
+sensors <- "WASP 1" #c("EPBV 90 1","EPBV 90 2","WASP 1")
+
+losColor <- "blue"
+
+acqColor <- "black"
+
+```
+
+Extract data from the two PostgreSQL Materialized Views created by the function in step 1.  
+
+```
+
+graphData <- modSim::Step3_multiDesingPointAndSensorDataPrep(pgConnParam = pgConnParam,
+                                                             sensorForce = sensorForce,
+                                                             targetForce = targetForce,
+                                                             designPoints = designPoints,
+                                                             sensors = sensors)
+
+```  
+
+With the data on your local environment, the next step is to graph the mean across the iterations.  
+
+```
+
+p_mean <- modSim::Step3_graphMean(graphData = graphData$byDesignPoint,
+                                  losColor = losColor,
+                                  acqColor = acqColor,
+                                  errorbars = TRUE)
+
+```  
+### EXPERIMENTAL: 
+
+Another interesting thing to do is to graph the data after aggregating it to expose which target entities the sensor entities has line of sight with and has acquired over time.
+
+```
+
+graphTargetColumnByDesignPoint(designPoints,
+                               pgConnParam,
+                               sensorForce,
+                               targetForce,
+                               sensor)
+                      
+```

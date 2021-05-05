@@ -29,6 +29,8 @@ Return a consistent formatted graph of the data.
 }
 \note{
 Location: ./R/fct_step3_high_graphMean.R
+
+RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}
