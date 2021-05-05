@@ -18,6 +18,7 @@
 #'  element_text labs facet_grid geom_errorbar
 #'
 #' @note Location: ./R/fct_step3_high_graphMean.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 Step3_graphMean <- function(graphData,
                             losColor = "blue",
                             acqColor = "black",
