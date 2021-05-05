@@ -341,7 +341,7 @@ targetColumnGraphData <- function(losMatViewData,
   
   return(histData)
   
-}
+} # close targetColumnGraphData function
 ```
 
 

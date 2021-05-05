@@ -26,10 +26,11 @@
 #' @importFrom tidyr drop_na
 #'
 #' @note Location: ./R/fct_step3_high_multiDesignPointAndSensorDataPrep.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
                                                     sensorForce,
                                                     targetForce,
-                                                    designPoints,
+                                                    designPoint,
                                                     sensors){
 
   { # set up
