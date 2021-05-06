@@ -4,21 +4,15 @@
 \alias{graphTargetColumnByDesignPoint}
 \title{Graph the Sensor - Target Column Chart, Faceted by Design Point}
 \usage{
-graphTargetColumnByDesignPoint(
-  designPoints,
-  pgConnParam,
-  sensorForce,
-  targetForce,
-  sensor
-)
+graphTargetColumnByDesignPoint(consolidateGraphDataTargetColumn)
 }
 \arguments{
-\item{designPoints}{This is a character vector of names describing designPoints
-as stored in the PostgreSQL datanase.}
-
 \item{sensorForce}{This is either "BLUEFORCE" or "REDFORCE".}
 
 \item{targetForce}{This is either "BLUEFORCE" or "REDFORCE".}
+
+\item{designPoints}{This is a character vector of names describing designPoints
+as stored in the PostgreSQL datanase.}
 
 \item{connParamList}{A five element named list containing the following elements:
 "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".}
