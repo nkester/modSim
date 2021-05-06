@@ -4,7 +4,7 @@
 #'
 #' @export Step3_meanDiffByDesignPointAndTime
 #'
-#' @importFrom dplyr select mutate group_by summaris n ungroup
+#' @importFrom dplyr select mutate group_by summarise n ungroup
 #' @importFrom tidyr pivot_wider
 #'
 #' @note Location: ./R/fct_step3_low_targetColumnGraphData.R
