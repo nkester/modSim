@@ -24,40 +24,7 @@
 #' @note Location: ./R/fct_step3_high_graphTargetColumnByDesignPoint.R
 #' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 graphTargetColumnByDesignPoint <- function(consolidateGraphDataTargetColumn){
-  # designPoints,
-  #                                          pgConnParam,
-  #                                          sensorForce,
-  #                                          targetForce,
-  #                                          sensor){
 
-  # histData <- tibble::tibble(time_s = NA,
-  #                            sensorShortName = "NA",
-  #                            designPoint = "NA",
-  #                            targetShortName = "NA",
-  #                            count_mean = 1.0,
-  #                            count_var = 1.0,
-  #                            count_sd = 1.0,
-  #                            count_se = 1.0,
-  #                            type = "NA")[0,]
-  #
-  # for(designPoint in designPoints){
-  #
-  #   tempData <- modSim::queryData(pgConnParam = pgConnParam,
-  #                                 sensorForce = sensorForce,
-  #                                 targetForce = targetForce,
-  #                                 designPoint = designPoint)
-  #
-  #   losMatViewData <- tempData$losMatViewData
-  #   acqMatViewData <- tempData$acqMatViewData
-  #   sensor <- "WASP 1"
-  #
-  #   data <- targetColumnGraphData(losMatViewData=losMatViewData,
-  #                                 acqMatViewData=acqMatViewData,
-  #                                 sensor=sensor)
-  #
-  #   histData <- dplyr::bind_rows(histData,data)
-  #
-  # } # close for designPoints
 
   { # Produce the Plot
 
@@ -72,8 +39,6 @@ graphTargetColumnByDesignPoint <- function(consolidateGraphDataTargetColumn){
 
   } # close Produce the Plot
 
-  # return(list("targetData" = histData,
-  #             "targetPlot" = p))
   return(p)
 
 } # close graphTargetColumnByDesign function
