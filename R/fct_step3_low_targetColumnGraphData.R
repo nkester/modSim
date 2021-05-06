@@ -18,8 +18,6 @@
 #'  bind_rows
 #' @importFrom tidyr replace_na
 #'
-#' @export targetColumnGraphData
-#'
 #' @note Location: ./R/fct_step3_low_targetColumnGraphData.R
 #' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 targetColumnGraphData <- function(losMatViewData,

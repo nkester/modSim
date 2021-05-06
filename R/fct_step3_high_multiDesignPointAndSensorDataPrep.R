@@ -35,19 +35,29 @@ Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
 
   { # set up
 
-    consolidateGraphDataIteration <- tibble::tibble(time_s=NA,
-                                                    designPoint=NA,
-                                                    iteration=NA,
-                                                    count=NA,
-                                                    sensorShortName=NA)
+    consolidateGraphDataIteration <- tibble::tibble(time_s = NA,
+                                                    designPoint = NA,
+                                                    iteration = NA,
+                                                    count = NA,
+                                                    sensorShortName = NA)
 
-    consolidateGraphDataMean <- tibble::tibble(time_s=NA,
-                                               designPoint=NA,
-                                               sensorShortName=NA,
-                                               count_mean=NA,
-                                               count_var=NA,
-                                               count_sd=NA,
-                                               count_se=NA)
+    consolidateGraphDataMean <- tibble::tibble(time_s = NA,
+                                               designPoint = NA,
+                                               sensorShortName = NA,
+                                               count_mean = NA,
+                                               count_var = NA,
+                                               count_sd = NA,
+                                               count_se = NA)
+
+    consolidateGraphDataTargetColumn <- tibble::tibble(time_s = NA,
+                                                       sensorShortName = NA,
+                                                       designPoint = NA,
+                                                       targetShortName = NA,
+                                                       count_mean = NA,
+                                                       count_var = NA,
+                                                       count_sd = NA,
+                                                       count_se = NA,
+                                                       type = NA)
 
   } # close set up
 
@@ -78,6 +88,10 @@ Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
                             acqMatViewData = designPointData$acqMatViewData,
                             sensor = sensor)
 
+      hist <- targetColumnGraphData(losMatViewData = designPointData$losMatViewData,
+                                    acqMatViewData = designPointData$acqMatViewData,
+                                    sensor = sensor)
+
       consolidateGraphDataIteration <- dplyr::bind_rows(temp$LOSbyIteration,
                                                         temp$ACQbyIteration,
                                                         consolidateGraphDataIteration)
@@ -86,7 +100,10 @@ Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
                                                    temp$ACQmeanByDesignPoint,
                                                    consolidateGraphDataMean)
 
-      rm(temp)
+      consolidateGraphDataTargetColumn <- dplyr::bind_rows(consolidateGraphDataTargetColumn,
+                                                           hist)
+
+      rm(temp,hist)
 
     } # close sensors loop
 
@@ -98,7 +115,10 @@ Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
 
   consolidateGraphDataMean <- tidyr::drop_na(consolidateGraphDataMean)
 
+  consolidateGraphDataTargetColumn <- tidyr::drop_na(consolidateGraphDataTargetColumn)
+
   return(list("byIteration" = consolidateGraphDataIteration,
-              "byDesignPoint" = consolidateGraphDataMean))
+              "byDesignPoint" = consolidateGraphDataMean,
+              "byTarget" = consolidateGraphDataTargetColumn))
 
 } # close Step3_multiDesingPointAndSensorDataPrep function
