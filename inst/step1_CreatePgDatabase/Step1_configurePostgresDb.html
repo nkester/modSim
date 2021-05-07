@@ -213,6 +213,10 @@ summary {
 #&#39;
 #&#39; @param connParamList A five element named list containing the following elements:
 #&#39;  &quot;pgHost&quot;, &quot;pgPort&quot;, &quot;pgUser&quot;, &quot;pgPass&quot;, and &quot;pgDb&quot;.
+#&#39; @param Materialized This is a boolean response if you want to make the view
+#&#39;  materialized or not. Materialized views greatly improve the performance of 
+#&#39;  queries although they duplicate data in memory so they can be costly to 
+#&#39;  disk space. Default is FALSE.
 #&#39;
 #&#39; @return This returns messages as the build progresses and then a `NULL` response.
 #&#39;
@@ -227,7 +231,7 @@ summary {
 #&#39; @note R script location: ./R/fct_step1_createModSimDb.R 
 #&#39; @note RMarkdown location: ./inst/step1_CreatePgDataBase/Step1_configurePostgresDb.Rmd
 Step1_createModSimDb &lt;- function(connParamList,
-                                 Materialized = TRUE){
+                                 Materialized = FALSE){
   
   { # Write Query Statements
     
@@ -492,7 +496,15 @@ Step1_createModSimDb &lt;- function(connParamList,
       
       { # Create Materialized Views
         
-        message(&quot;Working: Creating Materialized Views.&quot;)
+        if(Materialized){
+          
+          message(&quot;Working: Creating Materialized Views.&quot;)
+          
+        }else{
+          
+          message(&quot;Working: Creating Views &quot;)
+          
+        }
         
         DBI::dbSendQuery(conn = pgConn,
                          statement = query_createLosMatView)

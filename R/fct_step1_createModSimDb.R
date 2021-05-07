@@ -293,7 +293,15 @@ Step1_createModSimDb <- function(connParamList,
 
       { # Create Materialized Views
 
-        message("Working: Creating Materialized Views.")
+        if(Materialized){
+
+          message("Working: Creating Materialized Views.")
+
+        }else{
+
+          message("Working: Creating Views ")
+
+        }
 
         DBI::dbSendQuery(conn = pgConn,
                          statement = query_createLosMatView)

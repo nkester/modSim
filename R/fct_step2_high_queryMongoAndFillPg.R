@@ -18,6 +18,10 @@
 #'   times. Note that this pulls ALL iterations executed for that designPoint.
 #' @param batchSize A numeric integer representing how many records you want to
 #'  write to the PostgreSQL database at a time.
+#' @param Materialized This is a boolean response if you want to make the view
+#'  materialized or not. Materialized views greatly improve the performance of
+#'  queries although they duplicate data in memory so they can be costly to
+#'  disk space. Default is FALSE.
 #'
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
@@ -29,7 +33,8 @@
 Step2_queryMongoAndFillPg <- function(mongoConnParam,
                                       pgConnParam,
                                       designPoint,
-                                      batchSize=100){
+                                      batchSize=100,
+                                      Materialized = FALSE){
 
   message("Reading from MongDB Acquire.State.Sensor collection and writing to PostgreSQL sensorDescription, entityIdToName, sensorToEntityId, and unnestedSensorState tables.")
 
@@ -52,27 +57,31 @@ Step2_queryMongoAndFillPg <- function(mongoConnParam,
 
   { # Refresh the materialized Views ----
 
-    #> After writing all of the data for this designPoint to the PostgreSQL
-    #>  database, update the materialized views so that the data is ready to be
-    #>  queried. Failing to do this negates the utility of having a pre-executed
-    #>  view ready to be queried.
+    if(Materialized){
 
-    pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
-                             host = pgConnParam[["pgHost"]],
-                             port = pgConnParam[["pgPort"]],
-                             user = pgConnParam[["pgUser"]],
-                             password = pgConnParam[["pgPass"]],
-                             dbname = pgConnParam[["pgDb"]])
+      #> After writing all of the data for this designPoint to the PostgreSQL
+      #>  database, update the materialized views so that the data is ready to be
+      #>  queried. Failing to do this negates the utility of having a pre-executed
+      #>  view ready to be queried.
 
-    DBI::dbSendQuery(conn = pgConn,
-                     statement = "REFRESH MATERIALIZED VIEW los_sensor_target_pairs_materialized")
+      pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                               host = pgConnParam[["pgHost"]],
+                               port = pgConnParam[["pgPort"]],
+                               user = pgConnParam[["pgUser"]],
+                               password = pgConnParam[["pgPass"]],
+                               dbname = pgConnParam[["pgDb"]])
 
-    DBI::dbSendQuery(conn = pgConn,
-                     statement = "REFRESH MATERIALIZED VIEW acq_sensor_target_pairs_materialized")
+      DBI::dbSendQuery(conn = pgConn,
+                       statement = "REFRESH MATERIALIZED VIEW los_sensor_target_pairs_materialized")
 
-    DBI::dbDisconnect(conn = pgConn)
+      DBI::dbSendQuery(conn = pgConn,
+                       statement = "REFRESH MATERIALIZED VIEW acq_sensor_target_pairs_materialized")
 
-    rm(pgConn)
+      DBI::dbDisconnect(conn = pgConn)
+
+      rm(pgConn)
+
+    } # close if materialized
 
   } # close Refresh the materialized Views section
 
