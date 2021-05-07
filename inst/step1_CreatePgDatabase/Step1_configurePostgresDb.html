@@ -216,7 +216,7 @@ summary {
 #&#39;
 #&#39; @return This returns messages as the build progresses and then a `NULL` response.
 #&#39;
-#&#39; @export createModSimDb
+#&#39; @export Step1_createModSimDb
 #&#39;
 #&#39; @examples createModSimDb(connParamList = pgConnParam)
 #&#39;
@@ -224,8 +224,10 @@ summary {
 #&#39; @importFrom DBI dbConnect dbGetQuery dbSendQuery dbDisconnect
 #&#39; @importFrom magrittr %&gt;%
 #&#39;
-#&#39; @note Location: ./R/fct_step1_createModSimDb.R
-createModSimDb &lt;- function(connParamList){
+#&#39; @note R script location: ./R/fct_step1_createModSimDb.R 
+#&#39; @note RMarkdown location: ./inst/step1_CreatePgDataBase/Step1_configurePostgresDb.Rmd
+Step1_createModSimDb &lt;- function(connParamList,
+                                 Materialized = TRUE){
   
   { # Write Query Statements
     
@@ -306,7 +308,9 @@ createModSimDb &lt;- function(connParamList){
       #&gt; Drop with: &quot;DROP MATERIALIZED VIEW los_sensor_target_pairs_materialized&quot;
       #&gt; Refresh with: &quot;REFRESH MATERIALIZED VIEW CONCURRENTLY los_sensor_target_pairs_materialized&quot;
       
-      query_createLosMatView &lt;- &quot;
+      if(Materialized){
+        
+        query_createLosMatView &lt;- &quot;
                 CREATE MATERIALIZED VIEW IF NOT EXISTS los_sensor_target_pairs_materialized AS
                 SELECT
                   los.\&quot;time_s\&quot;,
@@ -328,13 +332,39 @@ createModSimDb &lt;- function(connParamList){
                       LEFT JOIN \&quot;entityIdToName\&quot; AS ent2
                         ON sens.\&quot;entityId\&quot; = ent2.\&quot;entityId\&quot;
                 &quot;
-      
+      }else{
+        
+        query_createLosMatView &lt;- &quot;
+                CREATE VIEW los_sensor_target_pairs_materialized AS
+                SELECT
+                  los.\&quot;time_s\&quot;,
+                  ent2.\&quot;shortName\&quot; AS \&quot;sensorShortName\&quot;,
+                  ent2.\&quot;force\&quot; AS \&quot;sensorForce\&quot;,
+                  ent1.\&quot;shortName\&quot; AS \&quot;targetShortName\&quot;,
+                  ent1.\&quot;force\&quot; AS \&quot;targetForce\&quot;,
+                  los.\&quot;hasLOS\&quot;,
+                  los.\&quot;designPoint\&quot;,
+                  los.\&quot;iteration\&quot;,
+                  los.\&quot;targetId\&quot;,
+                  los.\&quot;sensorId\&quot;,
+                  sens.\&quot;entityId\&quot; AS \&quot;sensorEntityId\&quot;
+                FROM \&quot;losState\&quot; AS los
+                  LEFT JOIN \&quot;entityIdToName\&quot; AS ent1
+                    ON los.\&quot;targetId\&quot; = ent1.\&quot;entityId\&quot;
+                    LEFT JOIN \&quot;sensorToEntityId\&quot; AS sens
+                      ON los.\&quot;sensorId\&quot; = sens.\&quot;sensorId\&quot;
+                      LEFT JOIN \&quot;entityIdToName\&quot; AS ent2
+                        ON sens.\&quot;entityId\&quot; = ent2.\&quot;entityId\&quot;
+                &quot;
+      }
     } # close LOS Sensor Target Pairs
     
     { # Sensor Acquisition Sensor Target Pairs
       
       #&gt; Drop with: &quot;DROP MATERIALIZED VIEW acq_sensor_target_pairs_materialized&quot;
       #&gt; Refresh with: &quot;REFRESH MATERIALIZED VIEW CONCURRENTLY acq_sensor_target_pairs_materialized&quot;
+      
+      if(Materialized){
       
       query_createAcqMatView &lt;- &quot;
                       CREATE MATERIALIZED VIEW IF NOT EXISTS acq_sensor_target_pairs_materialized AS
@@ -361,7 +391,35 @@ createModSimDb &lt;- function(connParamList){
                                 LEFT JOIN \&quot;entityIdToName\&quot; AS ent2
                                   ON sens.\&quot;entityId\&quot; = ent2.\&quot;entityId\&quot;
                       &quot;
-      
+      }else{
+        
+        query_createAcqMatView &lt;- &quot;
+                      CREATE VIEW acq_sensor_target_pairs_materialized AS
+                      SELECT
+                        acq.\&quot;time_s\&quot;,
+                        ent2.\&quot;shortName\&quot; AS \&quot;sensorShortName\&quot;,
+                        ent2.\&quot;force\&quot; AS \&quot;sensorForce\&quot;,
+                        ent1.\&quot;shortName\&quot; AS \&quot;targetShortName\&quot;,
+                        ent1.\&quot;force\&quot; AS \&quot;targetForce\&quot;,
+                        CASE WHEN acq.\&quot;detectionLevel\&quot; = &#39;SENSOR_NODETECTION&#39; THEN FALSE
+                               ELSE TRUE
+                             END AS \&quot;hasAcq\&quot;,
+                        acq.\&quot;detectionLevel\&quot;,
+                        acq.\&quot;designPoint\&quot;,
+                        acq.\&quot;iteration\&quot;,
+                        acq.\&quot;targetId\&quot;,
+                        acq.\&quot;sensorId\&quot;,
+                        sens.\&quot;entityId\&quot; AS \&quot;sensorEntityId\&quot;
+                      FROM \&quot;sensorAcqState\&quot; AS acq
+                        LEFT JOIN \&quot;entityIdToName\&quot; AS ent1
+                          ON acq.\&quot;targetId\&quot; = ent1.\&quot;entityId\&quot;
+                            LEFT JOIN \&quot;sensorToEntityId\&quot; AS sens
+                              ON acq.\&quot;sensorId\&quot; = sens.\&quot;sensorId\&quot; AND acq.\&quot;designPoint\&quot; = sens.\&quot;designPoint\&quot;
+                                LEFT JOIN \&quot;entityIdToName\&quot; AS ent2
+                                  ON sens.\&quot;entityId\&quot; = ent2.\&quot;entityId\&quot;
+                      &quot;
+        
+      }
     } # close Sensor Acquisition Sensor Target Pairs
     
   } # close Create Materialized Views
@@ -453,7 +511,7 @@ createModSimDb &lt;- function(connParamList){
   message(sprintf(&quot;Complete: The %s database exists and all tables have been created!&quot;,
                   connParamList[[&quot;pgDb&quot;]]))
   
-} # close createModSimDb</code></pre>
+} # close Step1_createModSimDb</code></pre>
 </div>
 </div>
 <div id="execution" class="section level1">

@@ -10,6 +10,10 @@
 #'
 #' @param connParamList A five element named list containing the following elements:
 #'  "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".
+#' @param Materialized This is a boolean response if you want to make the view
+#'  materialized or not. Materialized views greatly improve the performance of
+#'  queries although they duplicate data in memory so they can be costly to
+#'  disk space. Default is FALSE.
 #'
 #' @return This returns messages as the build progresses and then a `NULL` response.
 #'
@@ -23,7 +27,8 @@
 #'
 #' @note R script location: ./R/fct_step1_createModSimDb.R
 #' @note RMarkdown location: ./inst/step1_CreatePgDataBase/Step1_configurePostgresDb.Rmd
-Step1_createModSimDb <- function(connParamList){
+Step1_createModSimDb <- function(connParamList,
+                                 Materialized = FALSE){
 
   { # Write Query Statements
 
@@ -104,7 +109,9 @@ Step1_createModSimDb <- function(connParamList){
       #> Drop with: "DROP MATERIALIZED VIEW los_sensor_target_pairs_materialized"
       #> Refresh with: "REFRESH MATERIALIZED VIEW CONCURRENTLY los_sensor_target_pairs_materialized"
 
-      query_createLosMatView <- "
+      if(Materialized){
+
+        query_createLosMatView <- "
                 CREATE MATERIALIZED VIEW IF NOT EXISTS los_sensor_target_pairs_materialized AS
                 SELECT
                   los.\"time_s\",
@@ -126,7 +133,31 @@ Step1_createModSimDb <- function(connParamList){
                       LEFT JOIN \"entityIdToName\" AS ent2
                         ON sens.\"entityId\" = ent2.\"entityId\"
                 "
+      }else{
 
+        query_createLosMatView <- "
+                CREATE VIEW los_sensor_target_pairs_materialized AS
+                SELECT
+                  los.\"time_s\",
+                  ent2.\"shortName\" AS \"sensorShortName\",
+                  ent2.\"force\" AS \"sensorForce\",
+                  ent1.\"shortName\" AS \"targetShortName\",
+                  ent1.\"force\" AS \"targetForce\",
+                  los.\"hasLOS\",
+                  los.\"designPoint\",
+                  los.\"iteration\",
+                  los.\"targetId\",
+                  los.\"sensorId\",
+                  sens.\"entityId\" AS \"sensorEntityId\"
+                FROM \"losState\" AS los
+                  LEFT JOIN \"entityIdToName\" AS ent1
+                    ON los.\"targetId\" = ent1.\"entityId\"
+                    LEFT JOIN \"sensorToEntityId\" AS sens
+                      ON los.\"sensorId\" = sens.\"sensorId\"
+                      LEFT JOIN \"entityIdToName\" AS ent2
+                        ON sens.\"entityId\" = ent2.\"entityId\"
+                "
+      }
     } # close LOS Sensor Target Pairs
 
     { # Sensor Acquisition Sensor Target Pairs
@@ -134,7 +165,9 @@ Step1_createModSimDb <- function(connParamList){
       #> Drop with: "DROP MATERIALIZED VIEW acq_sensor_target_pairs_materialized"
       #> Refresh with: "REFRESH MATERIALIZED VIEW CONCURRENTLY acq_sensor_target_pairs_materialized"
 
-      query_createAcqMatView <- "
+      if(Materialized){
+
+        query_createAcqMatView <- "
                       CREATE MATERIALIZED VIEW IF NOT EXISTS acq_sensor_target_pairs_materialized AS
                       SELECT
                         acq.\"time_s\",
@@ -159,7 +192,35 @@ Step1_createModSimDb <- function(connParamList){
                                 LEFT JOIN \"entityIdToName\" AS ent2
                                   ON sens.\"entityId\" = ent2.\"entityId\"
                       "
+      }else{
 
+        query_createAcqMatView <- "
+                      CREATE VIEW acq_sensor_target_pairs_materialized AS
+                      SELECT
+                        acq.\"time_s\",
+                        ent2.\"shortName\" AS \"sensorShortName\",
+                        ent2.\"force\" AS \"sensorForce\",
+                        ent1.\"shortName\" AS \"targetShortName\",
+                        ent1.\"force\" AS \"targetForce\",
+                        CASE WHEN acq.\"detectionLevel\" = 'SENSOR_NODETECTION' THEN FALSE
+                               ELSE TRUE
+                             END AS \"hasAcq\",
+                        acq.\"detectionLevel\",
+                        acq.\"designPoint\",
+                        acq.\"iteration\",
+                        acq.\"targetId\",
+                        acq.\"sensorId\",
+                        sens.\"entityId\" AS \"sensorEntityId\"
+                      FROM \"sensorAcqState\" AS acq
+                        LEFT JOIN \"entityIdToName\" AS ent1
+                          ON acq.\"targetId\" = ent1.\"entityId\"
+                            LEFT JOIN \"sensorToEntityId\" AS sens
+                              ON acq.\"sensorId\" = sens.\"sensorId\" AND acq.\"designPoint\" = sens.\"designPoint\"
+                                LEFT JOIN \"entityIdToName\" AS ent2
+                                  ON sens.\"entityId\" = ent2.\"entityId\"
+                      "
+
+      }
     } # close Sensor Acquisition Sensor Target Pairs
 
   } # close Create Materialized Views
