@@ -175,7 +175,8 @@ graphDataPrep <- function(losMatViewData,
                        count_sd = sd(count),
                        count_se = count_sd/sqrt(dplyr::n()),
                        type = "LOS",
-                       .groups = "keep")
+                       .groups = "keep") %>%
+      dplyr::ungroup()
     
   } # close LOS Data Prep
   
@@ -229,7 +230,8 @@ graphDataPrep <- function(losMatViewData,
                        count_sd = sd(count),
                        count_se = count_sd/sqrt(dplyr::n()),
                        type = "ACQ",
-                       .groups = "keep")
+                       .groups = "keep") %>%
+      dplyr::ungroup()
     
   } # close ACQ Data Prep
   
@@ -242,7 +244,209 @@ graphDataPrep <- function(losMatViewData,
 
 ```
 
+## Target Column Graph Data: `targetColumnGraphData()`  
+
+This data is aggregated at the target level in order to see which targets the sensor entity is viewing.
+
+```{r}
+#' Target-Sensor Entity Data
+#'
+#' This function prepares the LOS and ACQ data at the target level by time step
+#'  rather than the design point level. This allows us to understand which targets
+#'  the chosen sensor has line of sight with and which it is able to acquire.
+#'
+#' @author Neil Kester, \email{nkester1@@jhu.edu}
+#'
+#' @param losMatViewData A tibble resulting from the `low_queryData` function.
+#' @param acqMatViewData A tibble resulting from the `low_queryData` function.
+#' @param sensor A single character string for the sensor you want to structure
+#'  data for. For multiple sensors, execute this function multiple times.
+#'
+#' @return This function returns a single tibble of time, sensor name, iteration,
+#'  design point, target name, and type (LOS or ACQ).
+#'
+#' @importFrom dplyr mutate distinct_all filter group_by summarise n ungroup
+#'  bind_rows
+#' @importFrom tidyr replace_na
+#'
+#' @note Location: ./R/fct_step3_low_targetColumnGraphData.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
+targetColumnGraphData <- function(losMatViewData,
+                                  acqMatViewData,
+                                  sensor){
+
+  { # LOS Data Prep
+
+    los <- losMatViewData %>%
+      dplyr::mutate(time_s = as.numeric(time_s)) %>%
+      dplyr::mutate(time_s = round(x = time_s,
+                                   digits = 0)) %>%
+      dplyr::distinct_all() %>%
+      dplyr::filter(sensorShortName %in% sensor) %>%
+      dplyr::group_by(time_s,
+                      sensorShortName,
+                      iteration,
+                      designPoint,
+                      targetShortName) %>%
+      dplyr::summarise(count = sum(hasLOS),
+                       .groups = "keep") %>%
+      dplyr::ungroup() %>%
+      dplyr::group_by(time_s,
+                      sensorShortName,
+                      designPoint,
+                      targetShortName) %>%
+      tidyr::replace_na(list(count = 0)) %>%
+      dplyr::summarise(count_mean = mean(count),
+                       count_var = var(count),
+                       count_sd = sd(count),
+                       count_se = count_sd/sqrt(dplyr::n()),
+                       type = "LOS",
+                       .groups = "keep") %>%
+      dplyr::ungroup()
+
+  } # close LOS Data Prep
+
+  { # ACQ Data Prep
+
+    acq <- acqMatViewData %>%
+      dplyr::mutate(time_s = as.numeric(time_s)) %>%
+      dplyr::mutate(time_s = round(x = time_s,
+                                   digits = 0)) %>%
+      dplyr::distinct_all() %>%
+      dplyr::filter(sensorShortName %in% sensor) %>%
+      dplyr::group_by(time_s,
+                      sensorShortName,
+                      iteration,
+                      designPoint,
+                      targetShortName) %>%
+      dplyr::summarise(count = sum(hasAcq),
+                       .groups = "keep") %>%
+      dplyr::ungroup() %>%
+      dplyr::group_by(time_s,
+                      sensorShortName,
+                      designPoint,
+                      targetShortName) %>%
+      tidyr::replace_na(list(count = 0)) %>%
+      dplyr::summarise(count_mean = mean(count),
+                       count_var = var(count),
+                       count_sd = sd(count),
+                       count_se = count_sd/sqrt(dplyr::n()),
+                       type = "ACQ",
+                       .groups = "keep") %>%
+      dplyr::ungroup()
+
+  } # close ACQ Data Prep
+
+  histData <- dplyr::bind_rows(los,acq)
+
+  return(histData)
+
+} # close targetColumnGraphData function
+
+```
+
+## Calculate the mean difference by time step between LOS and ACQ  
+
+```{r}
+#' Find the mean difference between the # of LOS and ACQ per timestep
+#'
+#' @param iterationData from modSim::Step3_multiDesingPointAndSensorDataPrep
+#'
+#' @export Step3_meanDiffByDesignPointAndTime
+#'
+#' @importFrom dplyr select mutate group_by summarise n ungroup
+#' @importFrom tidyr pivot_wider
+#'
+#' @note Location: ./R/fct_step3_low_targetColumnGraphData.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
+Step3_meanDiffByDesignPointAndTime <- function(iterationData){
+  
+  meanDiffByDesignPointAndTime <- graphData$byIteration %>%
+  dplyr::select(time_s,designPoint,iteration,sensorShortName,count,type) %>%
+  tidyr::pivot_wider(names_from = type,values_from = count) %>%
+  dplyr::mutate(diff = LOS - ACQ) %>%
+  dplyr::group_by(time_s,designPoint,sensorShortName) %>%
+  dplyr::summarise(diff_mean = mean(diff),
+                   diff_sd = sd(diff),
+                   diff_var = var(diff),
+                   diff_se = diff_sd/sqrt(dplyr::n()),
+                   .groups = "keep") %>%
+  dplyr::ungroup()
+  
+  return(meanDiffByDesignPointAndTime)
+  
+}
+```
+
+## Graph mean difference data  
+
+```{r}
+#' Graph the mean difference between LOS and ACQ
+#'
+#' @param meanIterationData Means found over iterations
+#'
+#' @return
+#' @export Step3_graphMeanIterations
+#'
+#' @importFrom ggplot2 ggplot geom_point aes theme_minimal labs facet_grid
+#'
+#' @note Location: ./R/fct_step3_low_graphMeanIterations.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
+Step3_graphMeanIterations <- function(meanIterationData){
+  
+  p <- ggplot2::ggplot(meanDiffByDesignPointAndTime) +
+    ggplot2::geom_point(mapping = ggplot2::aes(x = time_s,
+                                               y = diff_mean)) +
+    ggplot2::theme_minimal() +
+    ggplot2::labs(x = "time (s)",
+                  y = "Mean Difference Between LOS and ACQ",
+                  title = "Difference between a sensor's LOS and ACQ records by time step") +
+    ggplot2::facet_grid(sensorShortName ~ designPoint)
+  
+  return(p)
+  
+} # close Step3_graphMeanIterations function
+```
+
+## Produce box plot of difference data  
+
+```{r}
+#' Calculate and Produce Boxplot of data across iterations.
+#'
+#' @param iterationData raw data without summarization
+#'
+#' @return plot and data
+#' @export Step3_boxPlotOfDifferences
+#'
+#' @importFrom dplyr select mutate
+#' @importFrom tidyr pivot_wider
+#' @importFrom ggplot2 ggplot geom_boxplot aes theme_minimal theme element_text
+#'
+#' @note Location: ./R/fct_step3_low_boxPlotOfDifferences.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
+Step3_boxPlotOfDifferences <- function(iterationData){
+  
+  DiffByDesignPoint <- iterationData %>%
+  dplyr::select(time_s,designPoint,iteration,sensorShortName,count,type) %>%
+  tidyr::pivot_wider(names_from = type,values_from = count) %>%
+  dplyr::mutate(diff = LOS - ACQ) 
+
+  p <- ggplot2::ggplot(DiffByDesignPoint) +
+    ggplot2::geom_boxplot(mapping = ggplot2::aes(x = designPoint,y = diff)) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(strip.text.y = ggplot2::element_text(angle = 0))
+  
+  return(list(DiffByDesignPoint,
+              p))
+  
+}
+```
+
+
 # Mid Functions
+
+
+
 
 # High Functions
 
@@ -254,7 +458,7 @@ This high level function is used to query and prepare data in the two PostgreSQL
 #' Query and Prepare Data for Multiple Design Points and Sensors
 #'
 #' This function executes and integrates the two Step 3 low functions across a
-#'  number of designPoints and sensor entities. 
+#'  number of designPoints and sensor entities.
 #'
 #' @author Neil Kester, \email{nkester1@@jhu.edu}
 #'
@@ -270,7 +474,7 @@ This high level function is used to query and prepare data in the two PostgreSQL
 #' @return This returns a two element named list of consolidated data at the iteration
 #'  and designPoint level. DesignPoint level data is aggregated across the iterations
 #'  executed for each designPoint. Metrics calculated for that aggregation include
-#'  the mean, variance, standard deviation, and standard error. 
+#'  the mean, variance, standard deviation, and standard error.
 #'
 #' @export Step3_multiDesingPointAndSensorDataPrep
 #'
@@ -285,76 +489,97 @@ Step3_multiDesingPointAndSensorDataPrep <- function(pgConnParam,
                                                     targetForce,
                                                     designPoint,
                                                     sensors){
-  
+
   { # set up
-    
-    consolidateGraphDataIteration <- tibble::tibble(time_s=NA,
-                                                    designPoint=NA,
-                                                    iteration=NA,
-                                                    count=NA,
-                                                    sensorShortName=NA)
-    
-    consolidateGraphDataMean <- tibble::tibble(time_s=NA,
-                                               designPoint=NA,
-                                               sensorShortName=NA,
-                                               count_mean=NA,
-                                               count_var=NA,
-                                               count_sd=NA,
-                                               count_se=NA)
-    
+
+    consolidateGraphDataIteration <- tibble::tibble(time_s = NA,
+                                                    designPoint = NA,
+                                                    iteration = NA,
+                                                    count = NA,
+                                                    sensorShortName = NA)
+
+    consolidateGraphDataMean <- tibble::tibble(time_s = NA,
+                                               designPoint = NA,
+                                               sensorShortName = NA,
+                                               count_mean = NA,
+                                               count_var = NA,
+                                               count_sd = NA,
+                                               count_se = NA)
+
+    consolidateGraphDataTargetColumn <- tibble::tibble(time_s = NA,
+                                                       sensorShortName = NA,
+                                                       designPoint = NA,
+                                                       targetShortName = NA,
+                                                       count_mean = NA,
+                                                       count_var = NA,
+                                                       count_sd = NA,
+                                                       count_se = NA,
+                                                       type = NA)
+
   } # close set up
-  
+
   for(designPoint in designPoints){
-    
+
     message(paste0("\nWorking on ",
-                   designPoint, 
+                   designPoint,
                    " designPoint.\n"))
-    
+
     { # Query
-      
+
       designPointData <- queryData(pgConnParam = pgConnParam,
                                    sensorForce = sensorForce,
                                    targetForce = targetForce,
                                    designPoint = designPoint)
-      
+
     } # close Query
-    
+
     for(sensor in sensors){
-      
+
       message(paste0("\nWorking on ",
-                     sensor, 
-                     " sensor in ", 
-                     designPoint, 
+                     sensor,
+                     " sensor in ",
+                     designPoint,
                      " designPoint.\n"))
-      
+
       temp <- graphDataPrep(losMatViewData = designPointData$losMatViewData,
                             acqMatViewData = designPointData$acqMatViewData,
                             sensor = sensor)
-      
+
+      hist <- targetColumnGraphData(losMatViewData = designPointData$losMatViewData,
+                                    acqMatViewData = designPointData$acqMatViewData,
+                                    sensor = sensor)
+
       consolidateGraphDataIteration <- dplyr::bind_rows(temp$LOSbyIteration,
                                                         temp$ACQbyIteration,
                                                         consolidateGraphDataIteration)
-      
+
       consolidateGraphDataMean <- dplyr::bind_rows(temp$LOSmeanByDesignPoint,
                                                    temp$ACQmeanByDesignPoint,
                                                    consolidateGraphDataMean)
-      
-      rm(temp)
-      
+
+      consolidateGraphDataTargetColumn <- dplyr::bind_rows(consolidateGraphDataTargetColumn,
+                                                           hist)
+
+      rm(temp,hist)
+
     } # close sensors loop
-    
+
     rm(designPointData)
-    
+
   } # close designPoints loop
-  
+
   consolidateGraphDataIteration <- tidyr::drop_na(consolidateGraphDataIteration)
-  
+
   consolidateGraphDataMean <- tidyr::drop_na(consolidateGraphDataMean)
-  
+
+  consolidateGraphDataTargetColumn <- tidyr::drop_na(consolidateGraphDataTargetColumn)
+
   return(list("byIteration" = consolidateGraphDataIteration,
-              "byDesignPoint" = consolidateGraphDataMean))
-  
+              "byDesignPoint" = consolidateGraphDataMean,
+              "byTarget" = consolidateGraphDataTargetColumn))
+
 } # close Step3_multiDesingPointAndSensorDataPrep function
+
 
 ```
 
@@ -416,6 +641,58 @@ Step3_graphMean <- function(graphData,
   return(p)
   
 } # Step3_graphMean function
+```
+
+## Produce Column Plot of Multiple DesignPoints for a Single Sensor  
+
+
+```{r}
+
+#' Graph the Sensor - Target Column Chart, Faceted by Design Point
+#'
+#' This function accepts parameters, fetches data, transforms it, and produces a
+#'  graph that shows the number of target entities a sensor entity has line of
+#'  sight with and has acquired. This is further broken down by color that
+#'  corresponds to the target's name.
+#'
+#' @param sensorForce This is either "BLUEFORCE" or "REDFORCE".
+#' @param targetForce This is either "BLUEFORCE" or "REDFORCE".
+#' @param designPoints This is a character vector of names describing designPoints
+#'  as stored in the PostgreSQL datanase.
+#' @param connParamList A five element named list containing the following elements:
+#'  "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".
+#' @param sensors This is a character vector of sensor entity names you want to
+#'  structure data for.
+#'
+#' @return This returns a list of two elements, the data and the plot it made.
+#' @export graphTargetColumnByDesignPoint
+#'
+#' @importFrom tibble tibble
+#' @importFrom dplyr bind_rows
+#' @importFrom ggplot2 ggplot geom_col aes facet_grid theme_minimal theme element_text
+#'
+#' @note Location: ./R/fct_step3_high_graphTargetColumnByDesignPoint.R
+#' @note RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
+graphTargetColumnByDesignPoint <- function(consolidateGraphDataTargetColumn){
+
+
+  { # Produce the Plot
+
+    p <-ggplot2::ggplot(consolidateGraphDataTargetColumn) +
+      ggplot2::geom_col(mapping = ggplot2::aes(x = time_s,
+                                               y = count_mean,
+                                               fill = targetShortName)) +
+      #ggplot2::geom_errorbar(mapping = ggplot2::aes(x = time_s,ymax = count_mean + count_se,ymin = count_mean - count_se,color = targetShortName)) +
+      ggplot2::facet_grid(type ~ designPoint) +
+      ggplot2::theme_minimal() +
+      ggplot2::theme(title = ggplot2::element_text("LOS and ACQ broken out by DesignPoint and Target"))
+
+  } # close Produce the Plot
+
+  return(p)
+
+} # close graphTargetColumnByDesign function
+
 ```
 
 ```{r commonParameters}

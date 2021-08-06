@@ -9,7 +9,7 @@ Step3_multiDesingPointAndSensorDataPrep(
   pgConnParam,
   sensorForce,
   targetForce,
-  designPoints,
+  designPoint,
   sensors
 )
 }
@@ -18,14 +18,14 @@ Step3_multiDesingPointAndSensorDataPrep(
 
 \item{targetForce}{This is either "BLUEFORCE" or "REDFORCE".}
 
-\item{designPoints}{This is a character vector of names describing designPoints
-as stored in the PostgreSQL datanase.}
-
 \item{sensors}{This is a character vector of sensor entity names you want to
 structure data for.}
 
 \item{connParamList}{A five element named list containing the following elements:
 "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".}
+
+\item{designPoints}{This is a character vector of names describing designPoints
+as stored in the PostgreSQL datanase.}
 }
 \value{
 This returns a two element named list of consolidated data at the iteration
@@ -39,6 +39,8 @@ This function executes and integrates the two Step 3 low functions across a
 }
 \note{
 Location: ./R/fct_step3_high_multiDesignPointAndSensorDataPrep.R
+
+RMarkdown location: ./inst/step3_plotting/Step3_plotting.Rmd
 }
 \author{
 Neil Kester, \email{nkester1@jhu.edu}

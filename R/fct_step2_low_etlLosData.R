@@ -83,34 +83,38 @@ etlLosData <- function(mongoConnParam,
       utils::setTxtProgressBar(pb = pb,
                                value = rdx[[1]])
 
-      temp <- tibble::tibble("losState_pkid" = NA,
-                             "id" = x$`_id`,
-                             "runId" = x$runId,
-                             "runTime" = x$runTime,
-                             "designPoint" = x$designPoint,
-                             "iteration" = x$iteration,
-                             "time_ms" = x$time,
-                             "time_s" = x$time/1000,
-                             "sensorId" = x$event$sensorId,
-                             "targetId" = x$event$targetId,
-                             "hasLOS" = x$event$hasLOS)
+      if(!is.null(x)){
 
-      temp_query <- tryCatch(expr = fillTableQuery(data = temp,
-                                                   tableName = "\"losState\"",
-                                                   serial = "DEFAULT"),
-                             warning = function(w){
-                               message(w)
-                               return("")
-                             },
-                             error = function(e){
-                               message(e)
-                               return("")
-                             })
+        temp <- tibble::tibble("losState_pkid" = NA,
+                               "id" = x$`_id`,
+                               "runId" = x$runId,
+                               "runTime" = x$runTime,
+                               "designPoint" = x$designPoint,
+                               "iteration" = x$iteration,
+                               "time_ms" = x$time,
+                               "time_s" = x$time/1000,
+                               "sensorId" = x$event$sensorId,
+                               "targetId" = x$event$targetId,
+                               "hasLOS" = x$event$hasLOS)
 
-      DBI::dbSendQuery(conn = pgConn,
-                       statement = temp_query)
+        temp_query <- tryCatch(expr = fillTableQuery(data = temp,
+                                                     tableName = "\"losState\"",
+                                                     serial = "DEFAULT"),
+                               warning = function(w){
+                                 message(w)
+                                 return("")
+                               },
+                               error = function(e){
+                                 message(e)
+                                 return("")
+                               })
 
-      rdx[[1]] <- rdx[[1]] + 1
+        DBI::dbSendQuery(conn = pgConn,
+                         statement = temp_query)
+
+        rdx[[1]] <- rdx[[1]] + 1
+
+      } # close if is not null
 
     } # close While loop for iterator
 

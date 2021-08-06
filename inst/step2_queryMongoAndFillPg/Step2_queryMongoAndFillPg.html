@@ -202,9 +202,126 @@ summary {
 <div id="utility-function" class="section level1">
 <h1>Utility Function</h1>
 <p>These functions are used throughout the step and are considered “Utilities” because they augment workflows in a consistent manner.</p>
-<div id="create-a-pg-insert-query-from-a-tibble-in-batches-batch_fillandwrite" class="section level2">
-<h2>Create a PG Insert Query from a Tibble in batches: <code>batch_fillAndWrite()</code></h2>
-<p>This is a function I wrote in 2019 to convert an R tibble into a <code>SQLite</code> or <code>PostgreSQL</code> <code>INSERT</code> query. It is fairly robust. One limitation is the size of the resulting query string. Deal with this using the <code>batchSize</code> parameter to break the queries into manageable chunks.</p>
+<div id="create-a-postgresql-or-sqlite-insert-query-based-on-a-provided-tibble-of-data-filltablequery" class="section level2">
+<h2>Create a PostgreSQL or SQLite INSERT Query Based on a Provided Tibble of Data: <code>fillTableQuery()</code></h2>
+<p>This is a function I wrote in 2019 to convert an R tibble into a <code>SQLite</code> or <code>PostgreSQL</code> <code>INSERT</code> query. It is fairly robust. One limitation is the size of the resulting query string. Deal with this by using <code>batch_fillAndWrite()</code>.</p>
+<pre class="r"><code>#&#39; SQL Insert Query Builder
+#&#39;
+#&#39; This function takes a data frame and a table name (optionally including the
+#&#39;   field names in parentheses) and returns a string of a properly built SQL
+#&#39;   INSERT Query. This is most used with SQLite and PostgreSQL. Of note, to
+#&#39;   add the proper entry for auto-incrementing columns, pass an `NA` value for
+#&#39;   that field in the `data` parameter and provide the keyword in the `serial`
+#&#39;   parameter.
+#&#39;
+#&#39; @author Neil Kester, \email{nkester1@@jhu.edu}
+#&#39;
+#&#39; @param data This is a tibble of any dimension although thought should be given
+#&#39;  to very large data sets. It may be better to break the INSERT query into multiple
+#&#39;  smaller pushes.
+#&#39; @param tableName This is the name of the table. Note that some DBMS (namely)
+#&#39;   PostgreSQL does not automatically honor case. It is best to be explicit by
+#&#39;   wrapping all names within \&quot;&lt;name&gt;\&quot;. Additionally, you may be explicity by
+#&#39;   including in this parameter the order of the table&#39;s fields you are providing.
+#&#39;   This ensures the columns provided in the `data` parameter go to the proper
+#&#39;   location. Do this like this: tableName = &quot;\&quot;&lt;tableName\&quot; (\&quot;fieldOne\&quot;,
+#&#39;   \&quot;fieldTwo\&quot;)&quot;.
+#&#39; @param serial Any field in the `data` parameter with `NA` will be treated as
+#&#39;   if it is the auto-incrementing primary key for the table. If using
+#&#39;   PostgreSQL this should be &quot;DEFAULT&quot;. If using SQLite it should be &quot;NULL&quot;.
+#&#39;
+#&#39; @return This returns a character string that can be passed to a DBI::dbSendQuery
+#&#39;   function for execution on the DBMS.
+#&#39;
+#&#39; @export fillTableQuery
+#&#39;
+#&#39; @note Location: ./R/fct_utils_fillTableQuery.R
+#&#39; @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+fillTableQuery &lt;- function(data,
+                           tableName,
+                           serial = &quot;DEFAULT&quot;){
+
+  query&lt;-sprintf(&quot;INSERT INTO %s VALUES&quot;,
+                 tableName)
+
+  for(rdx in 1:nrow(data)){
+
+    query &lt;- paste(query,
+                   &quot;(&quot;,
+                   sep = &#39;&#39;)
+
+    row &lt;- NULL
+
+    for(cdx in 1:ncol(data)){
+
+      if(cdx == ncol(data)){
+
+        if(is.na(data[rdx,cdx][[1]])){
+
+          row &lt;- paste(row, 
+                       serial, 
+                       sep = &#39;&#39;)
+
+        }else{
+
+          row &lt;- paste(row,
+                       &quot;&#39;&quot;,
+                       data[rdx,cdx][[1]],
+                       &quot;&#39;&quot;,
+                       sep = &#39;&#39;)
+
+        } # close else
+
+      }else{
+
+        if(is.na(data[rdx,cdx][[1]])){
+
+          row &lt;-paste(row,
+                      serial,
+                      &quot;,&quot;,
+                      sep = &#39;&#39;)
+
+        }else{
+
+          row &lt;- paste(row,
+                       &quot;&#39;&quot;,
+                       data[rdx,cdx][[1]],
+                       &quot;&#39;,&quot;,
+                       sep = &#39;&#39;)
+
+        } # close else
+        
+      } # close else
+
+    }#close cdx loop
+
+    query &lt;- paste(query,
+                   row,
+                   sep = &#39;&#39;)
+
+    if(rdx == nrow(data)){
+
+      query &lt;- paste(query,
+                     &quot;)&quot;,
+                     sep = &#39;&#39;)
+
+    }else{#if complete
+
+      query &lt;- paste(query,
+                     &quot;),&quot;,
+                     sep = &#39;&#39;)
+
+    }#close else
+
+  }#close rdx loop
+
+  return(query)
+
+}#close fillTableQuery function</code></pre>
+</div>
+<div id="call-the-filltablequery-in-batches-batch_fillandwrite" class="section level2">
+<h2>Call the <code>fillTableQuery()</code> in batches: <code>batch_fillAndWrite()</code></h2>
+<p>Extend <code>fillTableQuery()</code> by breaking a large table into batches using the <code>batchSize</code> parameter.</p>
 <pre class="r"><code>#&#39; Utility Batch Fill and Write
 #&#39;
 #&#39; This is a utility function used in modSim to take a set of data, break it up
@@ -229,6 +346,7 @@ summary {
 #&#39; @return Returns nothing
 #&#39;
 #&#39; @note Location: ./R/fct_utils_batchFillAndWrite.R
+#&#39; @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 batch_fillAndWrite &lt;- function(data,
                                pgConnParam,
                                tableName,
@@ -340,6 +458,7 @@ batch_fillAndWrite &lt;- function(data,
 #&#39; @importFrom RPostgreSQL PostgreSQL
 #&#39;
 #&#39; @note Location: ./R/fct_utils_sendPgFillTableQuery.R
+#&#39; @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 sendPgFillTableQuery &lt;- function(query,
                                  host,
                                  port,
@@ -359,7 +478,7 @@ sendPgFillTableQuery &lt;- function(query,
 
   DBI::dbDisconnect(conn = pgConn)
 
-}</code></pre>
+} # close sendPgFillTableQuery function</code></pre>
 </div>
 </div>
 <div id="low-functions" class="section level1">
@@ -392,10 +511,11 @@ sendPgFillTableQuery &lt;- function(query,
 #&#39; @importFrom mongolite mongo
 #&#39;
 #&#39; @note Location: ./R/fct_step2_low_mapSensorsAndEntities.R
+#&#39; @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 mapSensorsAndEntities &lt;- function(mongoUri,
                                   mongoDb,
                                   mongoCollection,
-                                  desingPoint){
+                                  designPoint){
 
   mongoConnection &lt;- mongolite::mongo(url = mongoUri,
                                       db = mongoDb,
@@ -403,8 +523,8 @@ mapSensorsAndEntities &lt;- function(mongoUri,
 
   { # SENSOR DESCRIPTION ----
     
-    pipeline_sensorDescription &lt;- sprintf(&quot;[{\&quot;$match\&quot;:{\&quot;%s\&quot;: \&quot;WASP1_high_high_20210426\&quot;}},{\&quot;$group\&quot;:{\&quot;_id\&quot;: {\&quot;sensorId\&quot;: \&quot;$state.sensorId\&quot;,\&quot;acquireSensorType\&quot;: \&quot;$state.acquireSensorType\&quot;,\&quot;magnification\&quot;: \&quot;$state.magnification\&quot;}}}]&quot;,
-                                          desingPoint)
+    pipeline_sensorDescription &lt;- sprintf(&quot;[{\&quot;$match\&quot;:{\&quot;designPoint\&quot;: \&quot;%s\&quot;}},{\&quot;$group\&quot;:{\&quot;_id\&quot;: {\&quot;sensorId\&quot;: \&quot;$state.sensorId\&quot;,\&quot;acquireSensorType\&quot;: \&quot;$state.acquireSensorType\&quot;,\&quot;magnification\&quot;: \&quot;$state.magnification\&quot;}}}]&quot;,
+                                          designPoint)
     
     sensorDescription &lt;- mongoConnection$aggregate(pipeline = pipeline_sensorDescription)
     names(sensorDescription) &lt;- &quot;id&quot;
@@ -414,10 +534,10 @@ mapSensorsAndEntities &lt;- function(mongoUri,
 
   { # ENTITY ID TO NAME ----
     
-    pipeline_entityIdToName &lt;- sprintf(&quot;[{\&quot;$match\&quot;:{\&quot;%s\&quot;: \&quot;WASP1_high_high_20210426\&quot;}},{\&quot;$group\&quot;:{\&quot;_id\&quot;: {\&quot;entityId\&quot;: \&quot;$state.entityId\&quot;,\&quot;source\&quot;: \&quot;$state.status.source\&quot;}}}]&quot;,
-                                          desingPoint)
+    pipeline_entityIdToName &lt;- sprintf(&quot;[{\&quot;$match\&quot;:{\&quot;designPoint\&quot;: \&quot;%s\&quot;}},{\&quot;$group\&quot;:{\&quot;_id\&quot;: {\&quot;entityId\&quot;: \&quot;$state.entityId\&quot;,\&quot;source\&quot;: \&quot;$state.status.source\&quot;}}}]&quot;,
+                                          designPoint)
     
-    entityIdToName &lt;- mongoConnection$aggregate(pipeline = )
+    entityIdToName &lt;- mongoConnection$aggregate(pipeline = pipeline_entityIdToName)
     names(entityIdToName) &lt;- &quot;id&quot;
     entityIdToName &lt;- tibble::tibble(entityIdToName$id)
 
@@ -425,8 +545,8 @@ mapSensorsAndEntities &lt;- function(mongoUri,
 
   { # SENSOR TO ENTITY ----
     
-    pipeline_sensorToEntity &lt;- sprintf(&quot;[{\&quot;$match\&quot;:{\&quot;%s\&quot;: \&quot;WASP1_high_high_20210426\&quot;}},{\&quot;$group\&quot;:{\&quot;_id\&quot;: {\&quot;entityId\&quot;: \&quot;$state.entityId\&quot;,\&quot;sensorId\&quot;: \&quot;$state.sensorId\&quot;}}}]&quot;,
-                                          desingPoint)
+    pipeline_sensorToEntity &lt;- sprintf(&quot;[{\&quot;$match\&quot;:{\&quot;designPoint\&quot;: \&quot;%s\&quot;}},{\&quot;$group\&quot;:{\&quot;_id\&quot;: {\&quot;entityId\&quot;: \&quot;$state.entityId\&quot;,\&quot;sensorId\&quot;: \&quot;$state.sensorId\&quot;}}}]&quot;,
+                                          designPoint)
     
     sensorToEntity &lt;- mongoConnection$aggregate(pipeline = pipeline_sensorToEntity)
     names(sensorToEntity) &lt;- &quot;id&quot;
@@ -436,8 +556,8 @@ mapSensorsAndEntities &lt;- function(mongoUri,
 
   { # META DATA ----
     
-    pipeline_metaData &lt;- sprintf(&quot;[{\&quot;$match\&quot;:{\&quot;%s\&quot;: \&quot;WASP1_high_high_20210426\&quot;}},{\&quot;$group\&quot;:{\&quot;_id\&quot;: {\&quot;runId\&quot;: \&quot;$runId\&quot;,\&quot;designPoint\&quot;: \&quot;$designPoint\&quot;,\&quot;iteration\&quot;: \&quot;$iteration\&quot;}}}]&quot;,
-                                          desingPoint)
+    pipeline_metaData &lt;- sprintf(&quot;[{\&quot;$match\&quot;:{\&quot;designPoint\&quot;: \&quot;%s\&quot;}},{\&quot;$group\&quot;:{\&quot;_id\&quot;: {\&quot;runId\&quot;: \&quot;$runId\&quot;,\&quot;designPoint\&quot;: \&quot;$designPoint\&quot;,\&quot;iteration\&quot;: \&quot;$iteration\&quot;}}}]&quot;,
+                                          designPoint)
     
     metaData &lt;- mongoConnection$aggregate(pipeline = pipeline_metaData)
     names(metaData) &lt;- &quot;id&quot;
@@ -481,8 +601,10 @@ mapSensorsAndEntities &lt;- function(mongoUri,
 #&#39; @importFrom RPostgreSQL PostgreSQL
 #&#39; @importFrom DBI dbConnect dbSendQuery dbDisconnect
 #&#39; @importFrom tibble tibble
+#&#39; @importFrom utils txtProgressBar setTxtProgressBar
 #&#39;
 #&#39; @note Location: ./R/fct_step2_low_etlLosData.R
+#&#39; @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 etlLosData &lt;- function(mongoConnParam,
                        pgConnParam,
                        designPoint){
@@ -525,43 +647,57 @@ etlLosData &lt;- function(mongoConnParam,
                              password = pgConnParam$pgPass,
                              dbname = pgConnParam$pgDb)
     
-    rdx &lt;- 1
+    rdx &lt;- list(1)
+    
+    #&gt; Establish a progress bar
+    pb &lt;- utils::txtProgressBar(min = 0,
+                                max = numRecs,
+                                style = 3)
     
     #&gt; The iterator returns `null` when it reaches the last record.
     while(!is.null(x &lt;- it$one())){
       
-      message(paste0(&quot;LOS Row: &quot;,
-                     as.character(rdx),
-                     &quot;  is &quot;,
-                     round(x = rdx/numRecs,
-                           digits = 3)*100,
-                     &quot;% complete!&quot;)
-      )
+      utils::setTxtProgressBar(pb = pb,
+                               value = rdx[[1]])
       
-      x &lt;- it$one()
+      if(!is.null(x)){
+        
+        temp &lt;- tibble::tibble(&quot;losState_pkid&quot; = NA,
+                               &quot;id&quot; = x$`_id`,
+                               &quot;runId&quot; = x$runId,
+                               &quot;runTime&quot; = x$runTime,
+                               &quot;designPoint&quot; = x$designPoint,
+                               &quot;iteration&quot; = x$iteration,
+                               &quot;time_ms&quot; = x$time,
+                               &quot;time_s&quot; = x$time/1000,
+                               &quot;sensorId&quot; = x$event$sensorId,
+                               &quot;targetId&quot; = x$event$targetId,
+                               &quot;hasLOS&quot; = x$event$hasLOS) 
+        
+        temp_query &lt;- tryCatch(expr = fillTableQuery(data = temp,
+                                                     tableName = &quot;\&quot;losState\&quot;&quot;,
+                                                     serial = &quot;DEFAULT&quot;),
+                               warning = function(w){
+                                 message(w)
+                                 return(&quot;&quot;)
+                               },
+                               error = function(e){
+                                 message(e)
+                                 return(&quot;&quot;)
+                               })
+        
+        DBI::dbSendQuery(conn = pgConn,
+                         statement = temp_query)
+        
+        rdx[[1]] &lt;- rdx[[1]] + 1
+        
+      } # close if is not null
       
-      temp &lt;- tibble::tibble(&quot;losState_pkid&quot; = NA,
-                             &quot;id&quot; = x$`_id`,
-                             &quot;runId&quot; = x$runId,
-                             &quot;runTime&quot; = x$runTime,
-                             &quot;designPoint&quot; = x$designPoint,
-                             &quot;iteration&quot; = x$iteration,
-                             &quot;time_ms&quot; = x$time,
-                             &quot;time_s&quot; = x$time/1000,
-                             &quot;sensorId&quot; = x$event$sensorId,
-                             &quot;targetId&quot; = x$event$targetId,
-                             &quot;hasLOS&quot; = x$event$hasLOS) 
-      
-      temp_query &lt;- fillTableQuery(data = temp,
-                                   tableName = &quot;\&quot;losState\&quot;&quot;,
-                                   serial = &quot;DEFAULT&quot;)
-      
-      DBI::dbSendQuery(conn = pgConn,
-                       statement = temp_query)
-      
-      rdx &lt;- rdx + 1
-      
-    }
+    } # close While loop for iterator
+    
+    #&gt; Clean up the progress bar object
+    close(pb)
+    rm(pb)
     
     #&gt; Disconnect from the databases when the job is complete.
     DBI::dbDisconnect(conn = pgConn)
@@ -602,8 +738,10 @@ etlLosData &lt;- function(mongoConnParam,
 #&#39; @importFrom RPostgreSQL PostgreSQL
 #&#39; @importFrom DBI dbConnect dbSendQuery dbDisconnect
 #&#39; @importFrom tibble tibble
+#&#39; @importFrom utils txtProgressBar setTxtProgressBar
 #&#39;
 #&#39; @note Location: ./R/fct_step2_low_etlSensorAcq.R
+#&#39; @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 etlSensorAcq &lt;- function(mongoConnParam,
                          pgConnParam,
                          designPoint){
@@ -643,49 +781,64 @@ etlSensorAcq &lt;- function(mongoConnParam,
                              password = pgConnParam$pgPass,
                              dbname = pgConnParam$pgDb)
     
-    rdx &lt;- 1
+    rdx &lt;- list(1)
+    
+    #&gt; Establish a progress bar
+    pb &lt;- utils::txtProgressBar(min = 0,
+                                max = numRecs,
+                                style = 3)
     
     #&gt; The iterator returns `null` when it reaches the last record.    
     while(!is.null(x &lt;- it$one())){
       
-      message(paste0(&quot;Acq Row: &quot;,
-                     as.character(rdx),
-                     &quot;  is &quot;,
-                     round(x = rdx/numRecs,
-                           digits = 3)*100,
-                     &quot;% complete!&quot;)
-      )
+      utils::setTxtProgressBar(pb = pb,
+                               value = rdx[[1]])
       
-      x &lt;- it$one()
+      if(!is.null(x)){
+        
+        temp &lt;- tibble::tibble(&quot;sensorAcqState_pkid&quot; = NA,
+                               &quot;id&quot; = x$`_id`,
+                               &quot;runId&quot; = x$runId,
+                               &quot;runTime&quot; = x$runTime,
+                               &quot;designPoint&quot; = x$designPoint,
+                               &quot;iteration&quot; = x$iteration,
+                               &quot;time_ms&quot; = x$time,
+                               &quot;time_s&quot; = x$time/1000,
+                               &quot;receiverId&quot; = x$event$receiverId,
+                               &quot;senderId&quot; = x$event$senderId,
+                               &quot;sensorId&quot; = x$event$messageData$any$sensorDetection$sensorId,
+                               &quot;entityId&quot; = x$event$messageData$any$sensorDetection$entityId,
+                               &quot;targetId&quot; = x$event$messageData$any$sensorDetection$targetId,
+                               &quot;detectionLevel&quot; = x$event$messageData$any$sensorDetection$detectionLevel,
+                               &quot;previousDetectionLevel&quot; = x$event$messageData$any$sensorDetection$previousDetectionLevel,
+                               &quot;timeToDetection&quot; = x$event$messageData$any$sensorDetection$timeToDetection) 
+        
+        temp_query &lt;- tryCatch(fillTableQuery(data = temp,
+                                              tableName = &quot;\&quot;sensorAcqState\&quot;&quot;,
+                                              serial = &quot;DEFAULT&quot;),
+                               warning = function(w){
+                                 message(w)
+                                 return(&quot;&quot;)
+                               },
+                               error = function(e){
+                                 message(e)
+                                 return(&quot;&quot;)
+                               })
+        
+        DBI::dbSendQuery(conn = pgConn,
+                         statement = temp_query)
+        
+      }
       
-      temp &lt;- tibble::tibble(&quot;sensorAcqState_pkid&quot; = NA,
-                             &quot;id&quot; = x$`_id`,
-                             &quot;runId&quot; = x$runId,
-                             &quot;runTime&quot; = x$runTime,
-                             &quot;designPoint&quot; = x$designPoint,
-                             &quot;iteration&quot; = x$iteration,
-                             &quot;time_ms&quot; = x$time,
-                             &quot;time_s&quot; = x$time/1000,
-                             &quot;receiverId&quot; = x$event$receiverId,
-                             &quot;senderId&quot; = x$event$senderId,
-                             &quot;sensorId&quot; = x$event$messageData$any$sensorDetection$sensorId,
-                             &quot;entityId&quot; = x$event$messageData$any$sensorDetection$entityId,
-                             &quot;targetId&quot; = x$event$messageData$any$sensorDetection$targetId,
-                             &quot;detectionLevel&quot; = x$event$messageData$any$sensorDetection$detectionLevel,
-                             &quot;previousDetectionLevel&quot; = x$event$messageData$any$sensorDetection$previousDetectionLevel,
-                             &quot;timeToDetection&quot; = x$event$messageData$any$sensorDetection$timeToDetection) 
+      rdx[[1]] &lt;- rdx[[1]] + 1
       
-      temp_query &lt;- fillTableQuery(data = temp,
-                                   tableName = &quot;\&quot;sensorAcqState\&quot;&quot;,
-                                   serial = &quot;DEFAULT&quot;)
-      
-      DBI::dbSendQuery(conn = pgConn,
-                       statement = temp_query)
-      
-      rdx &lt;- rdx + 1
-      
-    }
+    } # close if is not null
     
+    #&gt; Clean up the progress bar object
+    close(pb)
+    rm(pb)
+    
+    #&gt; Disconnect from the database when the job is complete.
     DBI::dbDisconnect(conn = pgConn)
     mongoConn$disconnect()
     
@@ -729,6 +882,7 @@ etlSensorAcq &lt;- function(mongoConnParam,
 #&#39; @importFrom stringr str_detect str_extract
 #&#39;
 #&#39; @note Location: ./R/fct_step2_mid_etlSensorToEntityMappingTables.R
+#&#39; @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
 etlSensorToEntityMappingTables &lt;- function(mongoConnParam,
                                            pgConnParam,
                                            designPoint,
@@ -751,7 +905,7 @@ etlSensorToEntityMappingTables &lt;- function(mongoConnParam,
       entitySensorMapping &lt;- mapSensorsAndEntities(mongoUri = mongoConnParam[[&quot;mongoUri&quot;]],
                                                    mongoDb = mongoConnParam[[&quot;mongoDb&quot;]],
                                                    mongoCollection = mongoConnParam[[&quot;collection&quot;]],
-                                                   designPoint)
+                                                   designPoint = designPoint)
       
       metaData &lt;- entitySensorMapping$metaData
       
@@ -860,13 +1014,15 @@ etlSensorToEntityMappingTables &lt;- function(mongoConnParam,
 #&#39; @return This returns messages to the console updating the user on the function&#39;s
 #&#39;   status but returns no information.
 #&#39;
-#&#39; @export queryMongoAndFillPg
+#&#39; @export Step2_queryMongoAndFillPg
 #&#39;
 #&#39; @note Location: ./R/fct_step2_high_queryMongoAndFillPg.R
-queryMongoAndFillPg &lt;- function(mongoConnParam,
+#&#39; @note RMarkdown location: ./inst/step2_queryMongoAndFillPg/Step2_queryMongoAndFillPg.Rmd
+Step2_queryMongoAndFillPg &lt;- function(mongoConnParam,
                                 pgConnParam,
                                 designPoint,
-                                batchSize=100){
+                                batchSize=100,
+                                Materialized = FALSE){
   
   message(&quot;Reading from MongDB Acquire.State.Sensor collection and writing to PostgreSQL sensorDescription, entityIdToName, sensorToEntityId, and unnestedSensorState tables.&quot;)
   
@@ -889,33 +1045,37 @@ queryMongoAndFillPg &lt;- function(mongoConnParam,
   
   { # Refresh the materialized Views ----
     
-    #&gt; After writing all of the data for this designPoint to the PostgreSQL
-    #&gt;  database, update the materialized views so that the data is ready to be
-    #&gt;  queried. Failing to do this negates the utility of having a pre-executed
-    #&gt;  view ready to be queried.
-    
-    pgConn &lt;- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
-                             host = pgConnParam[[&quot;pgHost&quot;]],
-                             port = pgConnParam[[&quot;pgPort&quot;]],
-                             user = pgConnParam[[&quot;pgUser&quot;]],
-                             password = pgConnParam[[&quot;pgPass&quot;]],
-                             dbname = pgConnParam[[&quot;pgDb&quot;]])
-    
-    DBI::dbSendQuery(conn = pgConn,
-                     statement = &quot;REFRESH MATERIALIZED VIEW los_sensor_target_pairs_materialized&quot;)
-    
-    DBI::dbSendQuery(conn = pgConn,
-                     statement = &quot;REFRESH MATERIALIZED VIEW acq_sensor_target_pairs_materialized&quot;)
-    
-    DBI::dbDisconnect(conn = pgConn)
-    
-    rm(pgConn)
+    if(Materialized){
+      
+      #&gt; After writing all of the data for this designPoint to the PostgreSQL
+      #&gt;  database, update the materialized views so that the data is ready to be
+      #&gt;  queried. Failing to do this negates the utility of having a pre-executed
+      #&gt;  view ready to be queried.
+      
+      pgConn &lt;- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                               host = pgConnParam[[&quot;pgHost&quot;]],
+                               port = pgConnParam[[&quot;pgPort&quot;]],
+                               user = pgConnParam[[&quot;pgUser&quot;]],
+                               password = pgConnParam[[&quot;pgPass&quot;]],
+                               dbname = pgConnParam[[&quot;pgDb&quot;]])
+      
+      DBI::dbSendQuery(conn = pgConn,
+                       statement = &quot;REFRESH MATERIALIZED VIEW los_sensor_target_pairs_materialized&quot;)
+      
+      DBI::dbSendQuery(conn = pgConn,
+                       statement = &quot;REFRESH MATERIALIZED VIEW acq_sensor_target_pairs_materialized&quot;)
+      
+      DBI::dbDisconnect(conn = pgConn)
+      
+      rm(pgConn)
+      
+    } # close if materialized
     
   } # close Refresh the materialized Views section
   
   return(&quot;Complete!&quot;)
   
-} # close fct_high_queryMongoAndFillPg</code></pre>
+} # close Step2_queryMongoAndFillPg</code></pre>
 </div>
 </div>
 <div id="execution" class="section level1">
@@ -960,7 +1120,8 @@ designPoint &lt;- &quot;myDesignPoint&quot;
 
 response &lt;- queryMongoAndFillPg(mongoConnParam = mongoConnParam,
                     pgConnParam = pgConnParam,
-                    designPoint = designPoint)</code></pre>
+                    designPoint = designPoint,
+                    Materialized = FALSE)</code></pre>
 </div>
 
 

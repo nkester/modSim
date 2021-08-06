@@ -494,34 +494,38 @@ etlLosData <- function(mongoConnParam,
       utils::setTxtProgressBar(pb = pb,
                                value = rdx[[1]])
       
-      temp <- tibble::tibble("losState_pkid" = NA,
-                             "id" = x$`_id`,
-                             "runId" = x$runId,
-                             "runTime" = x$runTime,
-                             "designPoint" = x$designPoint,
-                             "iteration" = x$iteration,
-                             "time_ms" = x$time,
-                             "time_s" = x$time/1000,
-                             "sensorId" = x$event$sensorId,
-                             "targetId" = x$event$targetId,
-                             "hasLOS" = x$event$hasLOS) 
-      
-      temp_query <- tryCatch(expr = fillTableQuery(data = temp,
-                                   tableName = "\"losState\"",
-                                   serial = "DEFAULT"),
-                             warning = function(w){
-                               message(w)
-                               return("")
-                             },
-                             error = function(e){
-                               message(e)
-                               return("")
-                             })
-      
-      DBI::dbSendQuery(conn = pgConn,
-                       statement = temp_query)
-      
-      rdx[[1]] <- rdx[[1]] + 1
+      if(!is.null(x)){
+        
+        temp <- tibble::tibble("losState_pkid" = NA,
+                               "id" = x$`_id`,
+                               "runId" = x$runId,
+                               "runTime" = x$runTime,
+                               "designPoint" = x$designPoint,
+                               "iteration" = x$iteration,
+                               "time_ms" = x$time,
+                               "time_s" = x$time/1000,
+                               "sensorId" = x$event$sensorId,
+                               "targetId" = x$event$targetId,
+                               "hasLOS" = x$event$hasLOS) 
+        
+        temp_query <- tryCatch(expr = fillTableQuery(data = temp,
+                                                     tableName = "\"losState\"",
+                                                     serial = "DEFAULT"),
+                               warning = function(w){
+                                 message(w)
+                                 return("")
+                               },
+                               error = function(e){
+                                 message(e)
+                                 return("")
+                               })
+        
+        DBI::dbSendQuery(conn = pgConn,
+                         statement = temp_query)
+        
+        rdx[[1]] <- rdx[[1]] + 1
+        
+      } # close if is not null
       
     } # close While loop for iterator
     
@@ -630,41 +634,45 @@ etlSensorAcq <- function(mongoConnParam,
       utils::setTxtProgressBar(pb = pb,
                                value = rdx[[1]])
       
-      temp <- tibble::tibble("sensorAcqState_pkid" = NA,
-                             "id" = x$`_id`,
-                             "runId" = x$runId,
-                             "runTime" = x$runTime,
-                             "designPoint" = x$designPoint,
-                             "iteration" = x$iteration,
-                             "time_ms" = x$time,
-                             "time_s" = x$time/1000,
-                             "receiverId" = x$event$receiverId,
-                             "senderId" = x$event$senderId,
-                             "sensorId" = x$event$messageData$any$sensorDetection$sensorId,
-                             "entityId" = x$event$messageData$any$sensorDetection$entityId,
-                             "targetId" = x$event$messageData$any$sensorDetection$targetId,
-                             "detectionLevel" = x$event$messageData$any$sensorDetection$detectionLevel,
-                             "previousDetectionLevel" = x$event$messageData$any$sensorDetection$previousDetectionLevel,
-                             "timeToDetection" = x$event$messageData$any$sensorDetection$timeToDetection) 
-      
-      temp_query <- tryCatch(fillTableQuery(data = temp,
-                                            tableName = "\"sensorAcqState\"",
-                                            serial = "DEFAULT"),
-                             warning = function(w){
-                               message(w)
-                               return("")
-                             },
-                             error = function(e){
-                               message(e)
-                               return("")
-                             })
-      
-      DBI::dbSendQuery(conn = pgConn,
-                       statement = temp_query)
+      if(!is.null(x)){
+        
+        temp <- tibble::tibble("sensorAcqState_pkid" = NA,
+                               "id" = x$`_id`,
+                               "runId" = x$runId,
+                               "runTime" = x$runTime,
+                               "designPoint" = x$designPoint,
+                               "iteration" = x$iteration,
+                               "time_ms" = x$time,
+                               "time_s" = x$time/1000,
+                               "receiverId" = x$event$receiverId,
+                               "senderId" = x$event$senderId,
+                               "sensorId" = x$event$messageData$any$sensorDetection$sensorId,
+                               "entityId" = x$event$messageData$any$sensorDetection$entityId,
+                               "targetId" = x$event$messageData$any$sensorDetection$targetId,
+                               "detectionLevel" = x$event$messageData$any$sensorDetection$detectionLevel,
+                               "previousDetectionLevel" = x$event$messageData$any$sensorDetection$previousDetectionLevel,
+                               "timeToDetection" = x$event$messageData$any$sensorDetection$timeToDetection) 
+        
+        temp_query <- tryCatch(fillTableQuery(data = temp,
+                                              tableName = "\"sensorAcqState\"",
+                                              serial = "DEFAULT"),
+                               warning = function(w){
+                                 message(w)
+                                 return("")
+                               },
+                               error = function(e){
+                                 message(e)
+                                 return("")
+                               })
+        
+        DBI::dbSendQuery(conn = pgConn,
+                         statement = temp_query)
+        
+      }
       
       rdx[[1]] <- rdx[[1]] + 1
       
-    }
+    } # close if is not null
     
     #> Clean up the progress bar object
     close(pb)
@@ -852,6 +860,10 @@ This is the only function exported from this step in the process.
 #'   times. Note that this pulls ALL iterations executed for that designPoint.
 #' @param batchSize A numeric integer representing how many records you want to
 #'  write to the PostgreSQL database at a time.
+#' @param Materialized This is a boolean response if you want to make the view
+#'  materialized or not. Materialized views greatly improve the performance of 
+#'  queries although they duplicate data in memory so they can be costly to 
+#'  disk space. Default is FALSE.
 #'
 #' @return This returns messages to the console updating the user on the function's
 #'   status but returns no information.
@@ -863,7 +875,8 @@ This is the only function exported from this step in the process.
 Step2_queryMongoAndFillPg <- function(mongoConnParam,
                                 pgConnParam,
                                 designPoint,
-                                batchSize=100){
+                                batchSize=100,
+                                Materialized = FALSE){
   
   message("Reading from MongDB Acquire.State.Sensor collection and writing to PostgreSQL sensorDescription, entityIdToName, sensorToEntityId, and unnestedSensorState tables.")
   
@@ -886,27 +899,31 @@ Step2_queryMongoAndFillPg <- function(mongoConnParam,
   
   { # Refresh the materialized Views ----
     
-    #> After writing all of the data for this designPoint to the PostgreSQL
-    #>  database, update the materialized views so that the data is ready to be
-    #>  queried. Failing to do this negates the utility of having a pre-executed
-    #>  view ready to be queried.
-    
-    pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
-                             host = pgConnParam[["pgHost"]],
-                             port = pgConnParam[["pgPort"]],
-                             user = pgConnParam[["pgUser"]],
-                             password = pgConnParam[["pgPass"]],
-                             dbname = pgConnParam[["pgDb"]])
-    
-    DBI::dbSendQuery(conn = pgConn,
-                     statement = "REFRESH MATERIALIZED VIEW los_sensor_target_pairs_materialized")
-    
-    DBI::dbSendQuery(conn = pgConn,
-                     statement = "REFRESH MATERIALIZED VIEW acq_sensor_target_pairs_materialized")
-    
-    DBI::dbDisconnect(conn = pgConn)
-    
-    rm(pgConn)
+    if(Materialized){
+      
+      #> After writing all of the data for this designPoint to the PostgreSQL
+      #>  database, update the materialized views so that the data is ready to be
+      #>  queried. Failing to do this negates the utility of having a pre-executed
+      #>  view ready to be queried.
+      
+      pgConn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+                               host = pgConnParam[["pgHost"]],
+                               port = pgConnParam[["pgPort"]],
+                               user = pgConnParam[["pgUser"]],
+                               password = pgConnParam[["pgPass"]],
+                               dbname = pgConnParam[["pgDb"]])
+      
+      DBI::dbSendQuery(conn = pgConn,
+                       statement = "REFRESH MATERIALIZED VIEW los_sensor_target_pairs_materialized")
+      
+      DBI::dbSendQuery(conn = pgConn,
+                       statement = "REFRESH MATERIALIZED VIEW acq_sensor_target_pairs_materialized")
+      
+      DBI::dbDisconnect(conn = pgConn)
+      
+      rm(pgConn)
+      
+    } # close if materialized
     
   } # close Refresh the materialized Views section
   
@@ -958,7 +975,8 @@ designPoint <- "myDesignPoint"
 
 response <- queryMongoAndFillPg(mongoConnParam = mongoConnParam,
                     pgConnParam = pgConnParam,
-                    designPoint = designPoint)
+                    designPoint = designPoint,
+                    Materialized = FALSE)
 
 
 ```

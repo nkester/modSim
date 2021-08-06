@@ -4,11 +4,16 @@
 \alias{Step1_createModSimDb}
 \title{Create ModSim PostgreSQL Database}
 \usage{
-Step1_createModSimDb(connParamList)
+Step1_createModSimDb(connParamList, Materialized = FALSE)
 }
 \arguments{
 \item{connParamList}{A five element named list containing the following elements:
 "pgHost", "pgPort", "pgUser", "pgPass", and "pgDb".}
+
+\item{Materialized}{This is a boolean response if you want to make the view
+materialized or not. Materialized views greatly improve the performance of
+queries although they duplicate data in memory so they can be costly to
+disk space. Default is FALSE.}
 }
 \value{
 This returns messages as the build progresses and then a `NULL` response.

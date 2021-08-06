@@ -76,7 +76,8 @@ graphDataPrep <- function(losMatViewData,
                        count_sd = sd(count),
                        count_se = count_sd/sqrt(dplyr::n()),
                        type = "LOS",
-                       .groups = "keep")
+                       .groups = "keep") %>%
+      dplyr::ungroup()
 
   } # close LOS Data Prep
 
@@ -130,7 +131,8 @@ graphDataPrep <- function(losMatViewData,
                        count_sd = sd(count),
                        count_se = count_sd/sqrt(dplyr::n()),
                        type = "ACQ",
-                       .groups = "keep")
+                       .groups = "keep") %>%
+      dplyr::ungroup()
 
   } # close ACQ Data Prep
 

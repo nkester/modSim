@@ -8,7 +8,8 @@ Step2_queryMongoAndFillPg(
   mongoConnParam,
   pgConnParam,
   designPoint,
-  batchSize = 100
+  batchSize = 100,
+  Materialized = FALSE
 )
 }
 \arguments{
@@ -26,6 +27,11 @@ times. Note that this pulls ALL iterations executed for that designPoint.}
 
 \item{batchSize}{A numeric integer representing how many records you want to
 write to the PostgreSQL database at a time.}
+
+\item{Materialized}{This is a boolean response if you want to make the view
+materialized or not. Materialized views greatly improve the performance of
+queries although they duplicate data in memory so they can be costly to
+disk space. Default is FALSE.}
 }
 \value{
 This returns messages to the console updating the user on the function's

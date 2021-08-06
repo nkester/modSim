@@ -80,41 +80,45 @@ etlSensorAcq <- function(mongoConnParam,
       utils::setTxtProgressBar(pb = pb,
                                value = rdx[[1]])
 
-      temp <- tibble::tibble("sensorAcqState_pkid" = NA,
-                             "id" = x$`_id`,
-                             "runId" = x$runId,
-                             "runTime" = x$runTime,
-                             "designPoint" = x$designPoint,
-                             "iteration" = x$iteration,
-                             "time_ms" = x$time,
-                             "time_s" = x$time/1000,
-                             "receiverId" = x$event$receiverId,
-                             "senderId" = x$event$senderId,
-                             "sensorId" = x$event$messageData$any$sensorDetection$sensorId,
-                             "entityId" = x$event$messageData$any$sensorDetection$entityId,
-                             "targetId" = x$event$messageData$any$sensorDetection$targetId,
-                             "detectionLevel" = x$event$messageData$any$sensorDetection$detectionLevel,
-                             "previousDetectionLevel" = x$event$messageData$any$sensorDetection$previousDetectionLevel,
-                             "timeToDetection" = x$event$messageData$any$sensorDetection$timeToDetection)
+      if(!is.null(x)){
 
-      temp_query <- tryCatch(fillTableQuery(data = temp,
-                                            tableName = "\"sensorAcqState\"",
-                                            serial = "DEFAULT"),
-                             warning = function(w){
-                               message(w)
-                               return("")
-                             },
-                             error = function(e){
-                               message(e)
-                               return("")
-                             })
+        temp <- tibble::tibble("sensorAcqState_pkid" = NA,
+                               "id" = x$`_id`,
+                               "runId" = x$runId,
+                               "runTime" = x$runTime,
+                               "designPoint" = x$designPoint,
+                               "iteration" = x$iteration,
+                               "time_ms" = x$time,
+                               "time_s" = x$time/1000,
+                               "receiverId" = x$event$receiverId,
+                               "senderId" = x$event$senderId,
+                               "sensorId" = x$event$messageData$any$sensorDetection$sensorId,
+                               "entityId" = x$event$messageData$any$sensorDetection$entityId,
+                               "targetId" = x$event$messageData$any$sensorDetection$targetId,
+                               "detectionLevel" = x$event$messageData$any$sensorDetection$detectionLevel,
+                               "previousDetectionLevel" = x$event$messageData$any$sensorDetection$previousDetectionLevel,
+                               "timeToDetection" = x$event$messageData$any$sensorDetection$timeToDetection)
 
-      DBI::dbSendQuery(conn = pgConn,
-                       statement = temp_query)
+        temp_query <- tryCatch(fillTableQuery(data = temp,
+                                              tableName = "\"sensorAcqState\"",
+                                              serial = "DEFAULT"),
+                               warning = function(w){
+                                 message(w)
+                                 return("")
+                               },
+                               error = function(e){
+                                 message(e)
+                                 return("")
+                               })
+
+        DBI::dbSendQuery(conn = pgConn,
+                         statement = temp_query)
+
+      }
 
       rdx[[1]] <- rdx[[1]] + 1
 
-    }
+    } # close if is not null
 
     #> Clean up the progress bar object
     close(pb)
